@@ -6,6 +6,10 @@ from elasticsearch import AsyncElasticsearch
 from fastapi import FastAPI
 from fastapi.responses import ORJSONResponse
 
+
+# from aioredis_cluster import create_redis_cluster
+import aioredis_cluster
+
 from api.v1 import film
 from core import config
 from core.logger import LOGGING
@@ -24,7 +28,8 @@ async def startup():
     # Подключаемся к базам при старте сервера
     # Подключиться можем при работающем event-loop
     # Поэтому логика подключения происходит в асинхронной функции
-    redis.redis = await aioredis.create_redis_pool((config.REDIS_HOST, config.REDIS_PORT), minsize=10, maxsize=20)
+    redis.redis = await aioredis_cluster.create_redis_cluster(config.REDIS_HOST)
+
     elastic.es = AsyncElasticsearch(
         hosts=[f'{config.ELASTIC_HOST}:{config.ELASTIC_PORT}'])
 

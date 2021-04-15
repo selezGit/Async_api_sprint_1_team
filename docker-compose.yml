@@ -1,0 +1,44 @@
+version: '3.3'
+services:
+  back:
+    build: 
+      context: ./src
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
+    ports:
+      - 8000:8000
+    depends_on: 
+      - db
+      - elasticsearch
+    networks:
+      - redis
+  db:
+    image: postgres:12.0-alpine
+    env_file:
+      - ./.env
+    ports:
+      - 5432:5432
+    volumes:
+      - ./.pg-data:/var/lib/postgresql/data/
+      - ./src/create_schema.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: always
+    networks:
+      - redis
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.7.0
+    container_name: elasticsearch
+    environment:
+      - xpack.security.enabled=false
+      - discovery.type=single-node
+    user: "1000"
+    volumes:
+      - ./.es-data:/usr/share/elasticsearch/data
+    ports:
+      - 9200:9200
+      - 9300:9300
+    networks:
+      - redis
+
+networks:
+  redis:
+    external:
+      name: redis
