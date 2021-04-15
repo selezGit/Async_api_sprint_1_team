@@ -1,0 +1,117 @@
+version: '3.3'
+
+networks:
+  redis:
+    external:
+      name: redis
+
+services:
+  redis-node-0:
+    image: docker.io/bitnami/redis-cluster:6.0-debian-10
+    container_name: 'redis-node-0'
+    restart: always
+    networks:
+      - redis
+    ports:
+      - '6379:6379'
+    environment:
+      - 'ALLOW_EMPTY_PASSWORD=yes'
+      - 'REDIS_PORT=6379'
+      - 'REDIS_NODES=redis-node-0 redis-node-1 redis-node-2 redis-node-3 redis-node-4 redis-node-5'
+
+  redis-node-1:
+    image: docker.io/bitnami/redis-cluster:6.0-debian-10
+    container_name: 'redis-node-1'
+    restart: always
+    networks:
+      - redis
+    ports:
+      - '6380:6379'
+    environment:
+      - 'ALLOW_EMPTY_PASSWORD=yes'
+      - 'REDIS_PORT=6379'
+      - 'REDIS_NODES=redis-node-0 redis-node-1 redis-node-2 redis-node-3 redis-node-4 redis-node-5'
+
+  redis-node-2:
+    image: docker.io/bitnami/redis-cluster:6.0-debian-10
+    container_name: 'redis-node-2'
+    restart: always
+    networks:
+      - redis
+    ports:
+      - '6381:6379'
+    environment:
+      - 'ALLOW_EMPTY_PASSWORD=yes'
+      - 'REDIS_PORT=6379'
+      - 'REDIS_NODES=redis-node-0 redis-node-1 redis-node-2 redis-node-3 redis-node-4 redis-node-5'
+
+  redis-node-3:
+    image: docker.io/bitnami/redis-cluster:6.0-debian-10
+    container_name: 'redis-node-3'
+    restart: always
+    networks:
+      - redis
+    ports:
+      - '6382:6379'
+    environment:
+      - 'ALLOW_EMPTY_PASSWORD=yes'
+      - 'REDIS_PORT=6379'
+      - 'REDIS_NODES=redis-node-0 redis-node-1 redis-node-2 redis-node-3 redis-node-4 redis-node-5'
+
+  redis-node-4:
+    image: docker.io/bitnami/redis-cluster:6.0-debian-10
+    container_name: 'redis-node-4'
+    restart: always
+    networks:
+      - redis
+    ports:
+      - '6383:6379'
+    environment:
+      - 'ALLOW_EMPTY_PASSWORD=yes'
+      - 'REDIS_PORT=6379'
+      - 'REDIS_NODES=redis-node-0 redis-node-1 redis-node-2 redis-node-3 redis-node-4 redis-node-5'
+
+  redis-node-5:
+    image: docker.io/bitnami/redis-cluster:6.0-debian-10
+    container_name: 'redis-node-5'
+    restart: always
+    networks:
+      - redis
+    ports:
+      - '6384:6379'
+    environment:
+      - 'ALLOW_EMPTY_PASSWORD=yes'
+      - 'REDIS_PORT=6379'
+      - 'REDIS_NODES=redis-node-0 redis-node-1 redis-node-2 redis-node-3 redis-node-4 redis-node-5'
+
+  redis-cluster-init:
+    image: docker.io/bitnami/redis-cluster:6.0-debian-10
+    container_name: 'redis-cluster-init'
+    restart: "no"
+    networks:
+      - redis 
+    depends_on:
+      - redis-node-0
+      - redis-node-1
+      - redis-node-2
+      - redis-node-3
+      - redis-node-4
+      - redis-node-5
+    environment:
+      - 'REDIS_CLUSTER_REPLICAS=1'
+      - 'REDIS_NODES=redis-node-0 redis-node-1 redis-node-2 redis-node-3 redis-node-4 redis-node-5'
+      - 'REDIS_CLUSTER_CREATOR=yes'
+
+volumes:
+  redis-cluster_data-0:
+    driver: local
+  redis-cluster_data-1:
+    driver: local
+  redis-cluster_data-2:
+    driver: local
+  redis-cluster_data-3:
+    driver: local
+  redis-cluster_data-4:
+    driver: local
+  redis-cluster_data-5:
+    driver: local
