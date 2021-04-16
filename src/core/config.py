@@ -22,7 +22,7 @@ REDIS_HOST = os.getenv('REDIS_HOST', ["redis://redis-node-0",
 
 
 # Настройки Elasticsearch
-ELASTIC_HOST = os.getenv('ELASTIC_HOST', 'elasticseach')
+ELASTIC_HOST = os.getenv('ELASTIC_HOST', 'elasticsearch')
 ELASTIC_PORT = int(os.getenv('ELASTIC_PORT', 9200))
 
 # Корень проекта
