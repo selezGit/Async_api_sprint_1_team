@@ -37,6 +37,49 @@ services:
       - 9300:9300
     networks:
       - redis
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.10.1
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+
+  executable:
+    container_name: etl_executable_back
+    build:
+      context: .
+      dockerfile: etl/Dockerfile
+    environment:
+      POSTGRES_PASSWORD: movies
+      POSTGRES_USER: movies
+      POSTGRES_DB: movies_dev
+      POSTGRES_HOST: movies-db
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      REDIS_HOST: redis
+      RUN_ONCE: 0
+    restart: always
+    tty: true
+    volumes:
+      - ./etl/__init__.py:/etl.py
+    command: sleep infinity
+    depends_on:
+      - db
+      - elasticsearch
+
+  pgadmin:
+    container_name: pgadmin-back
+    image: dpage/pgadmin4
+    environment:
+      PGADMIN_DEFAULT_EMAIL: 'pgadmin4@pgadmin.org'
+      PGADMIN_DEFAULT_PASSWORD: 'admin'
+
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    restart: unless-stopped
+    depends_on:
+      - db
 
 networks:
   redis:
