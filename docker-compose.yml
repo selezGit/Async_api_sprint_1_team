@@ -43,21 +43,20 @@ services:
       - "5601:5601"
     depends_on:
       - elasticsearch
-    environment:
-      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    env_file:
+      - ./.env
+    networks:
+      - redis
 
   executable:
     container_name: etl_executable_back
     build:
       context: .
       dockerfile: etl/Dockerfile
+    env_file:
+      - ./.env
     environment:
-      POSTGRES_PASSWORD: movies
-      POSTGRES_USER: movies
-      POSTGRES_DB: movies_dev
-      POSTGRES_HOST: movies-db
-      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
-      REDIS_HOST: redis
+        - REDIS_HOST=redis
       RUN_ONCE: 0
     restart: always
     tty: true
@@ -67,6 +66,8 @@ services:
     depends_on:
       - db
       - elasticsearch
+    networks:
+      - redis
 
   pgadmin:
     container_name: pgadmin-back
@@ -80,6 +81,8 @@ services:
     restart: unless-stopped
     depends_on:
       - db
+    networks:
+      - redis
 
 networks:
   redis:
