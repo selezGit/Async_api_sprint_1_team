@@ -332,9 +332,10 @@ class ETLProcess:
             for film in film_works:
                 film_work_doc = {
                     k: v for k, v in film.items()
-                    if k in ('id', 'rating', 'title', 'description', 'type', 'genres')
+                    if k in ('id', 'title', 'description', 'type', 'genres')
                 }
                 film_work_doc['genres_names'] = [g['name'] for g in film['genres']]
+                film_work_doc['imdb_rating'] = film['rating']
                 film_work_doc.update({
                     'actors': [],
                     'writers': [],
