@@ -57,7 +57,7 @@ services:
       - ./.env
     environment:
         - REDIS_HOST=redis
-      RUN_ONCE: 0
+        - RUN_ONCE=0
     restart: always
     tty: true
     volumes:
