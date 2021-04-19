@@ -14,9 +14,10 @@
 ## Настройка
 
 Для корректного запуска проекта необходимо произвести ряд действий.
-1. Создать к корне проекта папки .es-data, .pg-data, .redis-data и выдать на них права:
+1. Создать к корне проекта папки .es-data, .pg-data, и выдать на них права:
 
-        $ mkdir.es-data .pg-data \
+
+        $ mkdir .es-data .pg-data \
         && chmod g+rwx .es-data .pg-data \
         && chgrp 1000 .es-data .pg-data
 
