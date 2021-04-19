@@ -1,28 +1,22 @@
-FROM python:3.8-alpine3.12
+FROM python:3.9.4-slim-buster
 
-# install rust for orjson
 
-RUN apk add build-base wget
-ENV PATH="/root/.cargo/bin:${PATH}"
-ENV RUSTFLAGS="-C target-feature=-crt-static"
-RUN wget https://sh.rustup.rs -O rustup-init \
-    && sh rustup-init -y --default-toolchain nightly-2020-09-14
-
-# set work directory
-WORKDIR /usr/src/app
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y netcat-openbsd gcc && \
+    apt-get clean
 
 
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
-RUN apk update \
-    && apk add postgresql-dev gcc python3-dev musl-dev \
-    && apk add tzdata
+
+# set work directory
+WORKDIR /usr/src/app
 
 
 # install dependencies
 RUN pip3 install --upgrade pip
-RUN pip install --no-binary=orjson orjson==3.3.1
 
 COPY requirements.txt .
 RUN pip3 --no-cache-dir install -r requirements.txt
@@ -31,7 +25,8 @@ RUN pip3 --no-cache-dir install -r requirements.txt
 RUN mkdir -p /home/app
 
 # create the app user
-RUN addgroup -S app -g 1000 && adduser -u 1000 -S app -G app
+RUN addgroup --system app && adduser --system --no-create-home --group app
+# RUN chown -R app:app /usr/src/app && chmod -R 755 /usr/src/app
 
 # create the appropriate directories
 ENV HOME=/home/app
@@ -40,13 +35,7 @@ WORKDIR $HOME
 # copy project
 COPY . $HOME
 
+RUN chmod +x /home/app/entrypoint.sh
 
-# chown all the files to the app user
-# RUN chown -R app:app $HOME
-
-# change to the app user
-# USER app
-
-RUN ls -la
 # # run entrypoint.sh
 ENTRYPOINT ["/home/app/entrypoint.sh"]

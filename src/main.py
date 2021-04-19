@@ -1,13 +1,11 @@
 import logging
 
-import aioredis
 import uvicorn as uvicorn
 from elasticsearch import AsyncElasticsearch
 from fastapi import FastAPI
 from fastapi.responses import ORJSONResponse
 
 
-# from aioredis_cluster import create_redis_cluster
 import aioredis_cluster
 
 from api.v1 import film

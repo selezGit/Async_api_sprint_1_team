@@ -4,4 +4,4 @@ redis: Redis = None
 
 # Функция понадобится при внедрении зависимостей
 async def get_redis() -> Redis:
-    return Redis
+    return redis
