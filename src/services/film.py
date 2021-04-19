@@ -39,7 +39,8 @@ class FilmService:
     async def _film_from_cache(self, film_id: str) -> Optional[Film]:
         # Пытаемся получить данные о фильме из кеша, используя команду get
         # https://redis.io/commands/get
-        data = await self.redis.get(film_id)
+       
+        data = await self.redis.get(film_id, )
         if not data:
             return None
 
