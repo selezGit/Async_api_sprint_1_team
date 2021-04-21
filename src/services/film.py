@@ -41,11 +41,27 @@ class FilmService:
         except exceptions.NotFoundError:
             return None
 
+    async def get_all_sorted(self,
+                             sort: str,
+                             page: int,
+                             size: int) -> Optional[List[Film]]:
+        """Функция получения всех фильмов в отсортированном виде"""
+
+        films = await self._films_from_cache(sort, page, size)
+        if not films:
+            films = await self._get_all_sorted_from_elastic(sort, page, size)
+            if not films:
+                return None
+
+            await self._put_films_to_cache(films, sort, page, size)
+
+        return films
+
     async def get_by_search(self, search: str,
                             page: int,
                             size: int
                             ) -> Optional[List[Film]]:
-        """Функция получения фильмов путём поиска с параметрами"""
+        """Функция поиска фильмов с параметрами"""
         films = await self._films_from_cache(search, page, size)
         if not films:
             films = await self._search_films_from_elastic(search, page, size)
@@ -55,6 +71,30 @@ class FilmService:
             await self._put_films_to_cache(films, search, page, size)
 
         return films
+
+    async def _get_all_sorted_from_elastic(self, sort: str,
+                                           page: int,
+                                           size: int
+                                           ) -> Optional[List[Film]]:
+        """функция получения фильмов в отсортированном порядке
+        скорее всего это будет на ГЛАВНОЙ СТРАНИЦЕ"""
+
+        query = {
+            'limit': size,
+            'from': (page - 1) * size,
+            "sort": {
+                sort: {
+                    "order": "DESC" if sort[0] == '-' else "ASC"
+                }
+            }
+        }
+
+        try:
+            doc = await self.elastic.search(index='movies', body=query)
+            return [Film(**film['_source']) for film in doc]
+
+        except exceptions.NotFoundError:
+            return None
 
     async def _search_films_from_elastic(self,
                                          search: str,

@@ -19,8 +19,7 @@ class FilmShort(BaseModel):
 
 @router.get('/{film_id}', response_model=Film)
 async def film_details(film_id: str, film_service: FilmService = Depends(get_film_service)) -> Film:
-    """Возвращает полную информацию по фильму
-    """
+    """Возвращает информацию по одному фильму"""
     film = await film_service.get_by_id(film_id)
     if not film:
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND,
@@ -42,6 +41,24 @@ async def film_search(query: str, size: Optional[int] = 50,
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND,
                             detail='film not found')
 
+    films_short = [FilmShort(id=film.id, title=film.title, imdb_rating=film.rating) for film in films]
+
+    return films_short
+
+@router.get("/film?", response_model=FilmShort)
+async def film_sort(sort: Optional[str] = '-rating',
+                    size: Optional[int] = 50,
+                    page: Optional[int]= 1,
+                    film_service: FilmService = Depends(get_film_service)
+                    ) -> Optional[List[FilmShort]]:
+    """Возвращает короткую информацию по всем фильмам, отсортированным по рейтингу"""
+    
+    films = await film_service.get_by_search(sort, page, size)
+
+    if not films:
+        raise HTTPException(status_code=HTTPStatus.NOT_FOUND,
+                            detail='film not found')
+    
     films_short = [FilmShort(id=film.id, title=film.title, imdb_rating=film.rating) for film in films]
 
     return films_short
