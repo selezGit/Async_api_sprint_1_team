@@ -72,29 +72,78 @@ class FilmService:
 
         return films
 
+    async def get_by_param(self, sort: str,
+                           filter: str,
+                           page: int,
+                           size: int
+                           ) -> Optional[List[Film]]:
+        """Функция получения всех фильмов с параметрами сортфировки\фильтрации"""
+
+        films = await self._films_from_cache(sort, page, size, {'filter': filter})
+        if not films:
+            films = await self._get_all_sorted_from_elastic(sort, page, size, {'filter': filter})
+            if not films:
+                return None
+
+            await self._put_films_to_cache(films, sort, page, size, {'filter': filter})
+
+        return films
+
     async def _get_all_sorted_from_elastic(self, sort: str,
                                            page: int,
-                                           size: int
+                                           size: int,
+                                           *args,
+                                           **kwargs
                                            ) -> Optional[List[Film]]:
         """функция получения фильмов в отсортированном порядке
         скорее всего это будет на ГЛАВНОЙ СТРАНИЦЕ"""
+        genre_id = kwargs.get('filter')
+
+        if sort[0] == '-':
+            order = "DESC"
+            sort = sort[1:]
+        else:
+            order = "ASC"
 
         query = {
-            'limit': size,
+            'size': size,
             'from': (page - 1) * size,
             "sort": {
                 sort: {
-                    "order": "DESC" if sort[0] == '-' else "ASC"
+                    "order": order
                 }
             }
         }
 
-        try:
-            doc = await self.elastic.search(index='movies', body=query)
-            return [Film(**film['_source']) for film in doc]
+        if genre_id:
+            query['query'] = {
+                "bool": {
+                    "filter": {
+                        "nested": {
+                            "path": "genres",
+                            "query": {
+                                "bool": {
+                                    "must": {
+                                        "match": {
+                                            "genres.id": genre_id
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
 
-        except exceptions.NotFoundError:
+        doc = await self.elastic.search(index='movies', body=query)
+        if not doc:
             return None
+        result = doc['hits']['hits']
+
+        if not result:
+            return None
+
+        return [Film(**film['_source']) for film in result]
 
     async def _search_films_from_elastic(self,
                                          search: str,
@@ -105,7 +154,7 @@ class FilmService:
         слову, возвращает список найденных фильмов"""
 
         query = {
-            'limit': size,
+            'size': size,
             'from': (page - 1) * size,
             "query": {
                 "bool": {
@@ -128,12 +177,15 @@ class FilmService:
             }
         }
 
-        try:
-            doc = await self.elastic.search(index='movies', body=query)
-            return [Film(**film['_source']) for film in doc]
-
-        except exceptions.NotFoundError:
+        doc = await self.elastic.search(index='movies', body=query)
+        if not doc:
             return None
+        result = doc['hits']['hits']
+
+        if not result:
+            return None
+
+        return [Film(**film['_source']) for film in result]
 
     async def _film_from_cache(self, film_id: str
                                ) -> Optional[Film]:
@@ -147,10 +199,13 @@ class FilmService:
 
     async def _films_from_cache(self, search: str,
                                 page: int,
-                                size: int
+                                size: int,
+                                *args,
+                                **kwargs
                                 ) -> Optional[List[Film]]:
         """Функция получения списка фильмов по параметрам."""
-        data = await self.redis.lrange(f'{search}:{page}:{size}:key', 0, -1, encoding='utf-8')
+        data = await self.redis.lrange(f'{search}:{kwargs.get("filter")}:{page}:{size}:key', 0, -1, encoding='utf-8')
+
         if not data:
             return None
 
@@ -165,10 +220,12 @@ class FilmService:
     async def _put_films_to_cache(self, films: List[Film],
                                   search: str,
                                   page: int,
-                                  size: int
+                                  size: int,
+                                  *args,
+                                   **kwargs
                                   ) -> None:
         """Сохраняем список фильмов в redis"""
-        await self.redis.lpush(f'{search}:{page}:{size}:key',
+        await self.redis.lpush(f'{search}:{kwargs.get("filter")}:{page}:{size}:key',
                                [film.json() for film in films],
                                expire=FILM_CACHE_EXPIRE_IN_SECONDS)
 
