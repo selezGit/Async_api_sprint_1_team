@@ -45,7 +45,7 @@ async def film_search(query: str, size: Optional[int] = 50,
 
     return films_short
 
-@router.get("/film?", response_model=FilmShort)
+@router.get("/film", response_model=FilmShort)
 async def film_sort(sort: Optional[str] = '-rating',
                     size: Optional[int] = 50,
                     page: Optional[int]= 1,
