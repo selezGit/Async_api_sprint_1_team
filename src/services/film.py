@@ -1,8 +1,8 @@
 from functools import lru_cache
-from typing import Optional
+from typing import Optional, List
 
 from aioredis import Redis
-from elasticsearch import AsyncElasticsearch
+from elasticsearch import AsyncElasticsearch, exceptions
 from fastapi import Depends
 
 from db.elastic import get_elastic
@@ -33,13 +33,59 @@ class FilmService:
         return film
 
     async def _get_film_from_elastic(self, film_id: str) -> Optional[Film]:
-        doc = await self.elastic.get('movies', film_id)
-        return Film(**doc['_source'])
+        try:
+            doc = await self.elastic.get('movies', film_id)
+            return Film(**doc['_source'])
+
+        except exceptions.NotFoundError:
+            return None
+
+    async def _get_films_from_elastic(self,
+                                      search: Optional[str] = None,
+                                      filter: Optional[str] = None,
+                                      order: Optional[str] = "DESC"
+                                      ) -> Optional[List[Film]]:
+        try:
+
+            query = {
+                "sort": [
+                    {
+                        "rating": {
+                            "order": order
+                        }
+                    }
+                ],
+                "query": {
+                    "bool": {
+                        "filter": [
+                            {
+                                "multi_match": {
+                                    "type": "best_fields",
+                                    "query": search
+                                }
+                            },
+                            {
+                                "match_phrase": {
+                                    "genres_names": {
+                                        "query": filter
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+
+            doc = await self.elastic.search(index='movies', body=query)
+            return [Film(**film['_source']) for film in doc]
+
+        except exceptions.NotFoundError:
+            return None
 
     async def _film_from_cache(self, film_id: str) -> Optional[Film]:
         # Пытаемся получить данные о фильме из кеша, используя команду get
         # https://redis.io/commands/get
-       
+
         data = await self.redis.get(film_id, )
         if not data:
             return None
