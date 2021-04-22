@@ -14,10 +14,9 @@ import json
 from pydantic import BaseSettings
 from elasticsearch import Elasticsearch, helpers
 from redis import Redis
-
+from rediscluster import RedisCluster
 
 logger = logging.getLogger("ETL")
-
 
 coloredlogs.install(level="DEBUG", logger=logger)
 
@@ -31,7 +30,6 @@ class ETLConfig(BaseSettings):
     )
     run_once: bool = os.getenv("RUN_ONCE")
     elasticsearch_hosts: str = os.getenv("ELASTICSEARCH_HOSTS")
-    redis_host: str = os.getenv("REDIS_HOST")
 
 
 class BaseStorage:
@@ -132,15 +130,15 @@ class Lookup:
     def get_updated_rows(self, table, modified, column_return=None):
 
         def inner(target: Generator):
-            print(2333)
             batch_num = 0
             batch_size = 500
-            # last_updated_at = "2020-03-31 07:20:04.992496+00"
+            last_updated_at = "0001-01-01 00:00:00.992496+00"
             while True and batch_num == 0:
+
                 state = self.state
-                last_updated_at = None
                 last_updated_at = state.get_key('last_updated_at') or last_updated_at
                 last_id = state.get_key('last_id')
+
                 if column_return:
                     select_columns = ",".join(["id", modified, column_return])
                 else:
@@ -165,7 +163,6 @@ class Lookup:
                     }
                 )
                 time.sleep(0.5)
-
                 if not modified_rows:
                     logger.info(f'No updated rows in {table} since {last_updated_at}')
                     break
@@ -332,9 +329,11 @@ class ETLProcess:
             for film in film_works:
                 film_work_doc = {
                     k: v for k, v in film.items()
-                    if k in ('id', 'title', 'description', 'type', 'genres')
+                    if k in ('id', 'title', 'description', 'type')
                 }
                 film_work_doc['genres_names'] = [g['name'] for g in film['genres']]
+                film_work_doc['genres'] = [{'id': g['id'], 'name': g['name']} for g in film['genres']]
+
                 film_work_doc['imdb_rating'] = film['rating']
                 film_work_doc.update({
                     'actors': [],
@@ -422,9 +421,18 @@ if __name__ == "__main__":
     config = ETLConfig()
 
     db = PostgresDatabase(url=config.db_url)
+
     storage = RedisStorage(
-        Redis(host=config.redis_host)
+        RedisCluster(startup_nodes=[
+            {"host": "redis-node-0", "port": "6379"},
+            {"host": "redis-node-1", "port": "6380"},
+            {"host": "redis-node-2", "port": "6381"},
+            {"host": "redis-node-3", "port": "6382"},
+            {"host": "redis-node-4", "port": "6383"},
+            {"host": "redis-node-5", "port": "6384"}
+        ])
     )
+
     lookup_params = {'db': db, 'storage': storage}
 
     processes = [
@@ -433,6 +441,7 @@ if __name__ == "__main__":
         ETLProcess(db=db, config=config, lookup=PersonFilmRoleLookup(**lookup_params)),
         ETLProcess(db=db, config=config, lookup=FilmWorkLookup(**lookup_params)),
     ]
+    
 
     manager = ETLManager(processes=processes, run_once=config.run_once)
     manager.loop_processes()
