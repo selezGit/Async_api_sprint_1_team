@@ -11,10 +11,4 @@ then
     echo "PostgreSQL started"
 fi
 
-# [ тут запуск миграций для admin_panel, в данном модуле deprecated ]
-# python manage.py makemigrations movie_admin
-# python manage.py migrate
-
-# [ тут будет запуск etl ]
-# python ETL/main.py &
 exec "$@"
