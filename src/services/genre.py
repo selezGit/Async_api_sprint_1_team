@@ -57,20 +57,19 @@ class GenreService(BaseService):
                                      ) -> Optional[List[Genre]]:
         """Функция поиска объекта в elasticsearch по data_id или параметрам."""
 
-        filter = kwargs.get('filter')
-        size = kwargs.get('size', 50)
+        size = kwargs.get('size')
         page = kwargs.get('page', 1)
 
-        if bool(bool(filter)+bool(size)+bool(page)):
+        if bool(bool(size)+bool(page)):
             # если что то из этого есть,
             # значит запрос был сделан с параметрами
-            query = await self._es_sort_query(page, size, {'filter': filter})
             try:
+                query = {'size': size, 'from': (page - 1) * size}
                 doc = await self.elastic.search(index='genres', body=query)
             except exceptions.NotFoundError:
                 print('index not found')
                 return None
-            
+
             if not doc:
                 return None
             result = doc['hits']['hits']
@@ -118,43 +117,6 @@ class GenreService(BaseService):
                                    expire=FILM_CACHE_EXPIRE_IN_SECONDS)
         else:
             print(f'failed load data: {data_id}')
-
-    async def _es_sort_query(self,
-                             page: int,
-                             size: int,
-                             *args,
-                             **kwargs
-                             ) -> Optional[dict]:
-        """Функция возвращает query запрос для es в зависимости от передаваемых параметров"""
-
-        query = {
-            'size': size,
-            'from': (page - 1) * size,
-        }
-
-        genre_id = kwargs.get('filter')
-
-        if genre_id:
-            query['query'] = {
-                "bool": {
-                    "filter": {
-                        "nested": {
-                            "path": "genres",
-                            "query": {
-                                "bool": {
-                                    "must": {
-                                        "match": {
-                                            "genres.id": genre_id
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-        return query
 
 
 @lru_cache()
