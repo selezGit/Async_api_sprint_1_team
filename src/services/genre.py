@@ -64,9 +64,13 @@ class GenreService(BaseService):
         if bool(bool(filter)+bool(size)+bool(page)):
             # если что то из этого есть,
             # значит запрос был сделан с параметрами
-            query = await self._es_sort_query(data_id, page, size, {'filter': filter})
-
-            doc = await self.elastic.search(index='movies', body=query)
+            query = await self._es_sort_query(page, size, {'filter': filter})
+            try:
+                doc = await self.elastic.search(index='genres', body=query)
+            except exceptions.NotFoundError:
+                print('index not found')
+                return None
+            
             if not doc:
                 return None
             result = doc['hits']['hits']
@@ -79,7 +83,7 @@ class GenreService(BaseService):
         else:
             # если параметров не было, значит ищем по id
             try:
-                doc = await self.elastic.get('movies', data_id)
+                doc = await self.elastic.get('genres', data_id)
                 return Genre(**doc['_source'])
 
             except exceptions.NotFoundError:
@@ -116,7 +120,6 @@ class GenreService(BaseService):
             print(f'failed load data: {data_id}')
 
     async def _es_sort_query(self,
-                             data_id: str,
                              page: int,
                              size: int,
                              *args,
@@ -124,20 +127,9 @@ class GenreService(BaseService):
                              ) -> Optional[dict]:
         """Функция возвращает query запрос для es в зависимости от передаваемых параметров"""
 
-        if data_id[0] == '-':
-            order = "DESC"
-            data_id = data_id[1:]
-        else:
-            order = "ASC"
-
         query = {
             'size': size,
             'from': (page - 1) * size,
-            "sort": {
-                data_id: {
-                    "order": order
-                }
-            }
         }
 
         genre_id = kwargs.get('filter')
