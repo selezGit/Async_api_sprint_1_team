@@ -55,7 +55,7 @@ class GenreService(BaseService):
                                      *args,
                                      **kwargs
                                      ) -> Optional[List[Genre]]:
-        """Функция поиска фильма в elasticsearch по film_id или параметрам."""
+        """Функция поиска объекта в elasticsearch по data_id или параметрам."""
 
         filter = kwargs.get('filter')
         size = kwargs.get('size', 50)
@@ -89,7 +89,7 @@ class GenreService(BaseService):
                            data_id: str,
                            data_type: Optional[str] = 'list'
                            ) -> Optional[Any]:
-        """Найти данные в кэше."""
+        """Найти обьекты в кэше."""
 
         if data_type == 'dict':
             # если запрос словаря, значит нужен поиск по id
@@ -105,7 +105,7 @@ class GenreService(BaseService):
             return data
 
     async def _load_cache(self, data_id: str, data: Any):
-        """Загрузка данных в кэш."""
+        """Запись объектов в кэш."""
 
         if isinstance(data, dict):
             await self.redis.set(data_id, data, ttl=FILM_CACHE_EXPIRE_IN_SECONDS)
@@ -122,6 +122,7 @@ class GenreService(BaseService):
                              *args,
                              **kwargs
                              ) -> Optional[dict]:
+        """Функция возвращает query запрос для es в зависимости от передаваемых параметров"""
 
         if data_id[0] == '-':
             order = "DESC"
