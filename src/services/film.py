@@ -1,12 +1,11 @@
 from functools import lru_cache
-from typing import Optional
+from typing import List, Optional
 
 from aioredis import Redis
-from elasticsearch import AsyncElasticsearch
-from fastapi import Depends
-
 from db.elastic import get_elastic
 from db.redis import get_redis
+from elasticsearch import AsyncElasticsearch, exceptions
+from fastapi import Depends
 from models.film import Film
 
 FILM_CACHE_EXPIRE_IN_SECONDS = 60 * 5  # 5 минут
@@ -17,43 +16,225 @@ class FilmService:
         self.redis = redis
         self.elastic = elastic
 
-    # get_by_id возвращает объект фильма. Он опционален, так как фильм может отсутствовать в базе
-    async def get_by_id(self, film_id: str) -> Optional[Film]:
-        # Пытаемся получить данные из кеша, потому что оно работает быстрее
+    async def get_by_id(self,
+                        film_id: str
+                        ) -> Optional[Film]:
+        """Функция получения фильма по id"""
         film = await self._film_from_cache(film_id)
         if not film:
-            # Если фильма нет в кеше, то ищем его в Elasticsearch
             film = await self._get_film_from_elastic(film_id)
             if not film:
-                # Если он отсутствует в Elasticsearch, значит, фильма вообще нет в базе
                 return None
-            # Сохраняем фильм  в кеш
+
             await self._put_film_to_cache(film)
 
         return film
 
-    async def _get_film_from_elastic(self, film_id: str) -> Optional[Film]:
-        doc = await self.elastic.get('movies', film_id)
-        return Film(**doc['_source'])
+    async def _get_film_from_elastic(self,
+                                     film_id: str
+                                     ) -> Optional[Film]:
+        """Функция поиска фильма в elasticsearch по film_id."""
+        try:
+            doc = await self.elastic.get('movies', film_id)
+            return Film(**doc['_source'])
 
-    async def _film_from_cache(self, film_id: str) -> Optional[Film]:
-        # Пытаемся получить данные о фильме из кеша, используя команду get
-        # https://redis.io/commands/get
-       
+        except exceptions.NotFoundError:
+            return None
+
+    async def get_all_sorted(self,
+                             sort: str,
+                             page: int,
+                             size: int) -> Optional[List[Film]]:
+        """Функция получения всех фильмов в отсортированном виде"""
+
+        films = await self._films_from_cache(sort, page, size)
+        if not films:
+            films = await self._get_all_sorted_from_elastic(sort, page, size)
+            if not films:
+                return None
+
+            await self._put_films_to_cache(films, sort, page, size)
+
+        return films
+
+    async def get_by_search(self,
+                            search: str,
+                            page: int,
+                            size: int
+                            ) -> Optional[List[Film]]:
+        """Функция поиска фильмов с параметрами"""
+        films = await self._films_from_cache(search, page, size)
+        if not films:
+            films = await self._search_films_from_elastic(search, page, size)
+            if not films:
+                return None
+
+            await self._put_films_to_cache(films, search, page, size)
+
+        return films
+
+    async def get_by_param(self,
+                           sort: str,
+                           filter: str,
+                           page: int,
+                           size: int
+                           ) -> Optional[List[Film]]:
+        """Функция получения всех фильмов с параметрами сортфировки\фильтрации"""
+
+        films = await self._films_from_cache(sort, page, size, {'filter': filter})
+        if not films:
+            films = await self._get_all_sorted_from_elastic(sort, page, size, {'filter': filter})
+            if not films:
+                return None
+
+            await self._put_films_to_cache(films, sort, page, size, {'filter': filter})
+
+        return films
+
+    async def _get_all_sorted_from_elastic(self,
+                                           sort: str,
+                                           page: int,
+                                           size: int,
+                                           *args,
+                                           **kwargs
+                                           ) -> Optional[List[Film]]:
+        """функция получения фильмов в отсортированном порядке
+        скорее всего это будет на ГЛАВНОЙ СТРАНИЦЕ"""
+
+        if sort[0] == '-':
+            order = "DESC"
+            sort = sort[1:]
+        else:
+            order = "ASC"
+
+        query = {
+            'size': size,
+            'from': (page - 1) * size,
+            "sort": {
+                sort: {
+                    "order": order
+                }
+            }
+        }
+
+        genre_id = kwargs.get('filter')
+
+        if genre_id:
+            query['query'] = {
+                "bool": {
+                    "filter": {
+                        "nested": {
+                            "path": "genres",
+                            "query": {
+                                "bool": {
+                                    "must": {
+                                        "match": {
+                                            "genres.id": genre_id
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+        doc = await self.elastic.search(index='movies', body=query)
+        if not doc:
+            return None
+        result = doc['hits']['hits']
+
+        if not result:
+            return None
+
+        return [Film(**film['_source']) for film in result]
+
+    async def _search_films_from_elastic(self,
+                                         search: str,
+                                         page: int,
+                                         size: int,
+                                         ) -> Optional[List[Film]]:
+        """Функция поиска фильмов по ключевому 
+        слову, возвращает список найденных фильмов"""
+
+        query = {
+            'size': size,
+            'from': (page - 1) * size,
+            "query": {
+                "bool": {
+                    "must": {
+                        "multi_match": {
+                            "type": "best_fields",
+                            "query": search,
+                            "fuzziness": "auto",
+                            "fields": [
+                                    "title^5",
+                                    "description^4",
+                                    "genres_names^3",
+                                    "actors_names^3",
+                                    "writers_names^2",
+                                    "directors_names^1"
+                            ]
+                        }
+                    }
+                }
+            }
+        }
+
+        doc = await self.elastic.search(index='movies', body=query)
+        if not doc:
+            return None
+        result = doc['hits']['hits']
+
+        if not result:
+            return None
+
+        return [Film(**film['_source']) for film in result]
+
+    async def _film_from_cache(self,
+                               film_id: str
+                               ) -> Optional[Film]:
+        """Функция получения фильма по film_id."""
         data = await self.redis.get(film_id, )
         if not data:
             return None
 
-        # pydantic предоставляет удобное API для создания объекта моделей из json
         film = Film.parse_raw(data)
         return film
 
-    async def _put_film_to_cache(self, film: Film):
-        # Сохраняем данные о фильме, используя команду set
-        # Выставляем время жизни кеша — 5 минут
-        # https://redis.io/commands/set
-        # pydantic позволяет сериализовать модель в json
+    async def _films_from_cache(self,
+                                search: str,
+                                page: int,
+                                size: int,
+                                *args,
+                                **kwargs
+                                ) -> Optional[List[Film]]:
+        """Функция получения списка фильмов по параметрам."""
+        data = await self.redis.lrange(f'{search}:{kwargs.get("filter")}:{page}:{size}:key', 0, -1, encoding='utf-8')
+
+        if not data:
+            return None
+
+        films = [Film.parse_raw(film) for film in data]
+        return films
+
+    async def _put_film_to_cache(self, film: Film
+                                 ) -> None:
+        """Сохраняем данные о фильме в redis"""
         await self.redis.set(film.id, film.json(), expire=FILM_CACHE_EXPIRE_IN_SECONDS)
+
+    async def _put_films_to_cache(self,
+                                  films: List[Film],
+                                  search: str,
+                                  page: int,
+                                  size: int,
+                                  *args,
+                                  **kwargs
+                                  ) -> None:
+        """Сохраняем список фильмов в redis"""
+        await self.redis.lpush(f'{search}:{kwargs.get("filter")}:{page}:{size}:key',
+                               [film.json() for film in films],
+                               expire=FILM_CACHE_EXPIRE_IN_SECONDS)
 
 
 @lru_cache()

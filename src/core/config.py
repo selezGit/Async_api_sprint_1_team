@@ -9,9 +9,9 @@ logging_config.dictConfig(LOGGING)
 # Название проекта. Используется в Swagger-документации
 PROJECT_NAME = os.getenv('PROJECT_NAME', 'movies')
 
-# Настройки Redis
+# Настройки Redis cluster
 # для кластера достаточно указания имени имени ноды,
-#  можно указать одну или сразу все
+# можно указать одну или сразу все
 REDIS_HOST = os.getenv('REDIS_HOST', ["redis://redis-node-0",
                                       "redis://redis-node-1",
                                       "redis://redis-node-2",
