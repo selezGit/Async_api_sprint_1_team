@@ -22,7 +22,7 @@ class BaseService:
 
     @abc.abstractmethod
     async def get_by_search(self, *args, **kwargs) -> Any:
-        """Найти объект по ключевому слову"""
+        """Найти объект(ы) по ключевому слову"""
         pass
 
     @abc.abstractmethod
@@ -32,10 +32,10 @@ class BaseService:
 
     @abc.abstractmethod
     async def _check_cache(self, *args, **kwargs) -> Any:
-        """Поискать объект\ы в кеше"""
+        """Поискать объект(ы) в кеше"""
         pass
 
     @abc.abstractmethod
     async def _load_cache(self, *args, **kwargs) -> None:
-        """Записать объект\ы в кэш"""
+        """Записать объект(ы) в кэш"""
         pass

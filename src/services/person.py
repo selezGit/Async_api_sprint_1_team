@@ -11,13 +11,18 @@ from models.person import Person
 from services.base import BaseService
 
 
-
 class PersonService(BaseService):
-    def __init__(self, redis: Redis, elastic: AsyncElasticsearch):
+    def __init__(self,
+                 redis: Redis,
+                 elastic: AsyncElasticsearch):
         self.redis = redis
         self.elastic = elastic
 
-    async def get_by_id(self, data_id: str, *args, **kwargs) -> Optional[Person]:
+    async def get_by_id(self,
+                        data_id: str,
+                        *args,
+                        **kwargs
+                        ) -> Optional[Person]:
         """Получить объект по uuid"""
 
         data = await self._check_cache(data_id, data_type='dict')
@@ -30,10 +35,12 @@ class PersonService(BaseService):
 
         return data
 
-    async def get_all(self, *args, **kwargs) -> Any:
+    async def get_all(self,
+                      *args,
+                      **kwargs
+                      ) -> Any:
         """Получить все объекты в отсортированном виде"""
         pass
-
 
     async def _get_data_from_elastic(self,
                                      data_id,
@@ -49,7 +56,25 @@ class PersonService(BaseService):
             # если что то из этого есть,
             # значит запрос был сделан с параметрами
             try:
-                query = {'size': size, 'from': (page - 1) * size}
+                query = {
+                    'size': size,
+                    'from': (page - 1) * size,
+                    "query": {
+                        "bool": {
+                            "must": {
+                                "multi_match": {
+                                    "type": "best_fields",
+                                    "query": data_id,
+                                    "fuzziness": "auto",
+                                    "fields": [
+                                        "full_name",
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+
                 doc = await self.elastic.search(index='persons', body=query)
             except exceptions.NotFoundError:
                 print('index not found')
@@ -73,12 +98,32 @@ class PersonService(BaseService):
             except exceptions.NotFoundError:
                 return None
 
+    async def get_by_search(self,
+                            data_id: str,
+                            page: int,
+                            size: int,
+                            *args,
+                            **kwargs
+                            ) -> Optional[List[Person]]:
+        """Найти объект(ы) по ключевому слову"""
 
-    async def get_by_search(self, *args, **kwargs) -> Any:
-        """Найти объект по ключевому слову"""
-        pass
+        filter = kwargs.get('filter')
 
-    async def get_by_param(self, *args, **kwargs) -> Any:
+        data = await self._check_cache(f'{data_id}:{filter}:{page}:{size}:key')
+
+        if not data:
+            data = await self._get_data_from_elastic(data_id, {'page': page, 'size': size})
+            if not data:
+                return None
+
+            await self._load_cache(f'{data_id}:{filter}:{page}:{size}:key', data)
+
+        return data
+
+    async def get_by_param(self,
+                           *args,
+                           **kwargs
+                           ) -> Any:
         """Получить объекты по параметрам"""
         pass
 
@@ -101,7 +146,9 @@ class PersonService(BaseService):
             data = [Person.parse_raw(person) for person in result]
             return data
 
-    async def _load_cache(self, data_id: str, data: Any):
+    async def _load_cache(self,
+                          data_id: str,
+                          data: Any) -> None:
         """Запись объектов в кэш."""
 
         if isinstance(data, dict):
@@ -111,7 +158,6 @@ class PersonService(BaseService):
                                    expire=self.FILM_CACHE_EXPIRE_IN_SECONDS)
         else:
             print(f'failed load data: {data_id}')
-
 
 
 @lru_cache()

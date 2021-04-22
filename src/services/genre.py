@@ -11,13 +11,18 @@ from models.genre import Genre
 from services.base import BaseService
 
 
-
 class GenreService(BaseService):
-    def __init__(self, redis: Redis, elastic: AsyncElasticsearch):
+    def __init__(self,
+                 redis: Redis,
+                 elastic: AsyncElasticsearch):
         self.redis = redis
         self.elastic = elastic
 
-    async def get_by_id(self, data_id: str, *args, **kwargs) -> Optional[Genre]:
+    async def get_by_id(self,
+                        data_id: str,
+                        *args,
+                        **kwargs
+                        ) -> Optional[Genre]:
         """Получить объект по uuid"""
 
         data = await self._check_cache(data_id, data_type='dict')
@@ -30,7 +35,11 @@ class GenreService(BaseService):
 
         return data
 
-    async def get_all(self, category: str, *args, **kwargs) -> Optional[List[Genre]]:
+    async def get_all(self,
+                      category: str,
+                      *args,
+                      **kwargs
+                      ) -> Optional[List[Genre]]:
         """Получить все объекты"""
 
         filter = kwargs.get('filter')
@@ -105,7 +114,9 @@ class GenreService(BaseService):
             data = [Genre.parse_raw(genre) for genre in result]
             return data
 
-    async def _load_cache(self, data_id: str, data: Any):
+    async def _load_cache(self,
+                          data_id: str,
+                          data: Any):
         """Запись объектов в кэш."""
 
         if isinstance(data, dict):
