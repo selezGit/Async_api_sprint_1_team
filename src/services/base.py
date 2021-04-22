@@ -4,6 +4,8 @@ from typing import Any
 
 
 class BaseService:
+    FILM_CACHE_EXPIRE_IN_SECONDS = 60 * 5  # 5 минут
+
     @abc.abstractmethod
     async def get_by_id(self, *args, **kwargs) -> Any:
         """Получить объект по uuid"""
@@ -12,6 +14,10 @@ class BaseService:
     @abc.abstractmethod
     async def get_all(self, *args, **kwargs) -> Any:
         """Получить все объекты в отсортированном виде"""
+        pass
+
+    async def _get_data_from_elastic(self, *args, **kwargs):
+        """Функция поиска объекта в elasticsearch по data_id или параметрам."""
         pass
 
     @abc.abstractmethod

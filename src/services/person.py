@@ -6,18 +6,18 @@ from db.elastic import get_elastic
 from db.redis import get_redis
 from elasticsearch import AsyncElasticsearch, exceptions
 from fastapi import Depends
-from models.genre import Genre
+from models.person import Person
 
 from services.base import BaseService
 
 
 
-class GenreService(BaseService):
+class PersonService(BaseService):
     def __init__(self, redis: Redis, elastic: AsyncElasticsearch):
         self.redis = redis
         self.elastic = elastic
 
-    async def get_by_id(self, data_id: str, *args, **kwargs) -> Optional[Genre]:
+    async def get_by_id(self, data_id: str, *args, **kwargs) -> Optional[Person]:
         """Получить объект по uuid"""
 
         data = await self._check_cache(data_id, data_type='dict')
@@ -30,29 +30,16 @@ class GenreService(BaseService):
 
         return data
 
-    async def get_all(self, category: str, *args, **kwargs) -> Optional[List[Genre]]:
-        """Получить все объекты"""
+    async def get_all(self, *args, **kwargs) -> Any:
+        """Получить все объекты в отсортированном виде"""
+        pass
 
-        filter = kwargs.get('filter')
-        size = kwargs.get('size')
-        page = kwargs.get('page')
-
-        data = await self._check_cache(f'{category}:{filter}:{page}:{size}:key')
-        if not data:
-            # TODO
-            data = await self._get_data_from_elastic(category, {'filter': filter, 'size': size, 'page': page})
-            if not data:
-                return None
-
-            await self._load_cache(f'{category}:{filter}:{size}:{page}:key', data)
-
-        return data
 
     async def _get_data_from_elastic(self,
                                      data_id,
                                      *args,
                                      **kwargs
-                                     ) -> Optional[List[Genre]]:
+                                     ) -> Optional[List[Person]]:
         """Функция поиска объекта в elasticsearch по data_id или параметрам."""
 
         size = kwargs.get('size')
@@ -63,7 +50,7 @@ class GenreService(BaseService):
             # значит запрос был сделан с параметрами
             try:
                 query = {'size': size, 'from': (page - 1) * size}
-                doc = await self.elastic.search(index='genres', body=query)
+                doc = await self.elastic.search(index='persons', body=query)
             except exceptions.NotFoundError:
                 print('index not found')
                 return None
@@ -75,16 +62,25 @@ class GenreService(BaseService):
             if not result:
                 return None
 
-            return [Genre(**genre['_source']) for genre in result]
+            return [Person(**person['_source']) for person in result]
 
         else:
             # если параметров не было, значит ищем по id
             try:
-                result = await self.elastic.get('genres', data_id)
-                return Genre(**result['_source'])
+                result = await self.elastic.get('persons', data_id)
+                return Person(**result['_source'])
 
             except exceptions.NotFoundError:
                 return None
+
+
+    async def get_by_search(self, *args, **kwargs) -> Any:
+        """Найти объект по ключевому слову"""
+        pass
+
+    async def get_by_param(self, *args, **kwargs) -> Any:
+        """Получить объекты по параметрам"""
+        pass
 
     async def _check_cache(self,
                            data_id: str,
@@ -102,7 +98,7 @@ class GenreService(BaseService):
             if not result:
                 return None
 
-            data = [Genre.parse_raw(genre) for genre in result]
+            data = [Person.parse_raw(person) for person in result]
             return data
 
     async def _load_cache(self, data_id: str, data: Any):
@@ -117,9 +113,10 @@ class GenreService(BaseService):
             print(f'failed load data: {data_id}')
 
 
+
 @lru_cache()
-def get_genre_service(
+def get_person_service(
         redis: Redis = Depends(get_redis),
         elastic: AsyncElasticsearch = Depends(get_elastic),
-) -> GenreService:
-    return GenreService(redis, elastic)
+) -> PersonService:
+    return PersonService(redis, elastic)
