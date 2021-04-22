@@ -13,11 +13,12 @@ router = APIRouter()
 class FilmShort(BaseModel):
     id: uuid.UUID
     title: str
-    imdb_rating: Optional[float] = 0
+    rating: Optional[float] = 0
 
 
 @router.get('/{film_id}', response_model=Film)
-async def film_details(film_id: str, film_service: FilmService = Depends(get_film_service)) -> Film:
+async def film_details(film_id: str,
+                       film_service: FilmService = Depends(get_film_service)) -> Film:
     """Возвращает информацию по одному фильму"""
     film = await film_service.get_by_id(film_id)
     if not film:
@@ -27,7 +28,8 @@ async def film_details(film_id: str, film_service: FilmService = Depends(get_fil
 
 
 @router.get('/search?query={query}', response_model=FilmShort)
-async def film_search(query: str, size: Optional[int] = 50,
+async def film_search(query: str,
+                      size: Optional[int] = 50,
                       page: Optional[int] = 1,
                       film_service: FilmService = Depends(get_film_service)
                       ) -> Optional[List[FilmShort]]:
@@ -41,7 +43,7 @@ async def film_search(query: str, size: Optional[int] = 50,
                             detail='film not found')
 
     films_short = [FilmShort(id=film.id, title=film.title,
-                             imdb_rating=film.rating) for film in films]
+                             rating=film.rating) for film in films]
 
     return films_short
 
@@ -63,6 +65,6 @@ async def film_sort_filter(sort: Optional[str] = '-rating',
                             detail='film not found')
 
     films_short = [FilmShort(id=film.id, title=film.title,
-                             imdb_rating=film.rating) for film in films]
+                             rating=film.rating) for film in films]
 
     return films_short

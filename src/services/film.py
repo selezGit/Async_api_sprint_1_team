@@ -1,14 +1,12 @@
 from functools import lru_cache
-from typing import Optional, List
+from typing import List, Optional
 
 from aioredis import Redis
-from elasticsearch import AsyncElasticsearch, exceptions
-from fastapi import Depends
-
 from db.elastic import get_elastic
 from db.redis import get_redis
+from elasticsearch import AsyncElasticsearch, exceptions
+from fastapi import Depends
 from models.film import Film
-from uuid import UUID
 
 FILM_CACHE_EXPIRE_IN_SECONDS = 60 * 5  # 5 минут
 
@@ -18,7 +16,8 @@ class FilmService:
         self.redis = redis
         self.elastic = elastic
 
-    async def get_by_id(self, film_id: str
+    async def get_by_id(self,
+                        film_id: str
                         ) -> Optional[Film]:
         """Функция получения фильма по id"""
         film = await self._film_from_cache(film_id)
@@ -31,7 +30,8 @@ class FilmService:
 
         return film
 
-    async def _get_film_from_elastic(self, film_id: str
+    async def _get_film_from_elastic(self,
+                                     film_id: str
                                      ) -> Optional[Film]:
         """Функция поиска фильма в elasticsearch по film_id."""
         try:
@@ -57,7 +57,8 @@ class FilmService:
 
         return films
 
-    async def get_by_search(self, search: str,
+    async def get_by_search(self,
+                            search: str,
                             page: int,
                             size: int
                             ) -> Optional[List[Film]]:
@@ -72,7 +73,8 @@ class FilmService:
 
         return films
 
-    async def get_by_param(self, sort: str,
+    async def get_by_param(self,
+                           sort: str,
                            filter: str,
                            page: int,
                            size: int
@@ -89,7 +91,8 @@ class FilmService:
 
         return films
 
-    async def _get_all_sorted_from_elastic(self, sort: str,
+    async def _get_all_sorted_from_elastic(self,
+                                           sort: str,
                                            page: int,
                                            size: int,
                                            *args,
@@ -97,7 +100,6 @@ class FilmService:
                                            ) -> Optional[List[Film]]:
         """функция получения фильмов в отсортированном порядке
         скорее всего это будет на ГЛАВНОЙ СТРАНИЦЕ"""
-        genre_id = kwargs.get('filter')
 
         if sort[0] == '-':
             order = "DESC"
@@ -114,6 +116,8 @@ class FilmService:
                 }
             }
         }
+
+        genre_id = kwargs.get('filter')
 
         if genre_id:
             query['query'] = {
@@ -187,7 +191,8 @@ class FilmService:
 
         return [Film(**film['_source']) for film in result]
 
-    async def _film_from_cache(self, film_id: str
+    async def _film_from_cache(self,
+                               film_id: str
                                ) -> Optional[Film]:
         """Функция получения фильма по film_id."""
         data = await self.redis.get(film_id, )
@@ -197,7 +202,8 @@ class FilmService:
         film = Film.parse_raw(data)
         return film
 
-    async def _films_from_cache(self, search: str,
+    async def _films_from_cache(self,
+                                search: str,
                                 page: int,
                                 size: int,
                                 *args,
@@ -217,12 +223,13 @@ class FilmService:
         """Сохраняем данные о фильме в redis"""
         await self.redis.set(film.id, film.json(), expire=FILM_CACHE_EXPIRE_IN_SECONDS)
 
-    async def _put_films_to_cache(self, films: List[Film],
+    async def _put_films_to_cache(self,
+                                  films: List[Film],
                                   search: str,
                                   page: int,
                                   size: int,
                                   *args,
-                                   **kwargs
+                                  **kwargs
                                   ) -> None:
         """Сохраняем список фильмов в redis"""
         await self.redis.lpush(f'{search}:{kwargs.get("filter")}:{page}:{size}:key',
