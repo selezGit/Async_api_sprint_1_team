@@ -14,10 +14,9 @@ import json
 from pydantic import BaseSettings
 from elasticsearch import Elasticsearch, helpers
 from redis import Redis
-
+from rediscluster import RedisCluster
 
 logger = logging.getLogger("ETL")
-
 
 coloredlogs.install(level="DEBUG", logger=logger)
 
@@ -31,7 +30,6 @@ class ETLConfig(BaseSettings):
     )
     run_once: bool = os.getenv("RUN_ONCE")
     elasticsearch_hosts: str = os.getenv("ELASTICSEARCH_HOSTS")
-    redis_host: str = os.getenv("REDIS_HOST")
 
 
 class BaseStorage:
@@ -121,26 +119,27 @@ class PostgresDatabase:
 class Lookup:
     db: PostgresDatabase
     storage: Any
+    path_redis: str = None
 
     @property
     def state(self):
         return State(
             self.storage,
-            path=self.__class__.__name__ + '_state'
+            path=self.path_redis or self.__class__.__name__ + '_state'
         )
 
     def get_updated_rows(self, table, modified, column_return=None):
 
         def inner(target: Generator):
-            print(2333)
             batch_num = 0
             batch_size = 500
-            # last_updated_at = "2020-03-31 07:20:04.992496+00"
+            last_updated_at = "0001-01-01 00:00:00.992496+00"
             while True and batch_num == 0:
+
                 state = self.state
-                last_updated_at = None
                 last_updated_at = state.get_key('last_updated_at') or last_updated_at
                 last_id = state.get_key('last_id')
+
                 if column_return:
                     select_columns = ",".join(["id", modified, column_return])
                 else:
@@ -165,7 +164,6 @@ class Lookup:
                     }
                 )
                 time.sleep(0.5)
-
                 if not modified_rows:
                     logger.info(f'No updated rows in {table} since {last_updated_at}')
                     break
@@ -267,11 +265,23 @@ class FilmWorkLookup(Lookup):
         )
 
 
+
+
+@dataclass
+class ETLProcessPerson:
+    db: PostgresDatabase
+    config: ETLConfig
+    lookup: Lookup
+    index: str
+
+
+
 @dataclass
 class ETLProcess:
     db: PostgresDatabase
     config: ETLConfig
     lookup: Lookup
+    index: str
 
     @coroutine
     def extract_film_works(self, target: Generator):
@@ -307,7 +317,8 @@ class ETLProcess:
                         gfw.filmwork_id,
                         array_agg(jsonb_build_object(
                             'id', g.id, 
-                            'name', g.name
+                            'name', g.name,
+                            'description', g.description
                         )) AS genres
                     FROM "content".film_work_genre gfw
                     JOIN "content".genre g ON g.id = gfw.genre_id
@@ -329,12 +340,24 @@ class ETLProcess:
         film_works: List[dict]
         while film_works := (yield):
             film_work_docs = []
+            genre_docs_raw = dict()
+            persons_docs_raw = dict()
             for film in film_works:
+
+                for genre in film['genres']:
+                    genre_docs_raw[genre['id']] = {
+                        'id': genre['id'],
+                        'name': genre['name'],
+                        'description': genre['description']
+                    }
+
                 film_work_doc = {
                     k: v for k, v in film.items()
-                    if k in ('id', 'title', 'description', 'type', 'genres')
+                    if k in ('id', 'title', 'description', 'type')
                 }
                 film_work_doc['genres_names'] = [g['name'] for g in film['genres']]
+                film_work_doc['genres'] = [{'id': g['id'], 'name': g['name']} for g in film['genres']]
+
                 film_work_doc['imdb_rating'] = film['rating']
                 film_work_doc.update({
                     'actors': [],
@@ -345,6 +368,17 @@ class ETLProcess:
                 })
                 if film['persons'] is not None:
                     for person in film['persons']:
+                        if person['id'] in persons_docs_raw:
+                            persons_docs_raw[person['id']]['role'].add(person['role'])
+                            persons_docs_raw[person['id']]['film_ids'].add(film['id'])
+                        else:
+                            persons_docs_raw[person['id']] = {
+                                'id': person['id'],
+                                'full_name': person['full_name'],
+                                'role': set([person['role']]),
+                                'film_ids': set([film['id']])
+                            }
+
                         if person['role'] == 'director':
                             film_work_doc['director'] = person['full_name']
                         if person['role'] == 'actor':
@@ -358,7 +392,20 @@ class ETLProcess:
                                 {'id': person['id'], 'name': person['full_name']}
                             )
                 film_work_docs.append(film_work_doc)
-            target.send(film_work_docs)
+            genre_docs = [genre_doc for genre_doc in genre_docs_raw.values()]
+            person_docs = [
+                {"id": person_doc['id'],
+                 'roles': list(person_doc['role']),
+                 'full_name': person_doc['full_name'],
+                 'film_ids': list(person_doc['film_ids'])
+                 } for person_doc in persons_docs_raw.values()
+            ]
+            if self.index == 'genre':
+                target.send(genre_docs)
+            elif self.index == 'movies':
+                target.send(film_work_docs)
+            elif self.index == 'persons':
+                target.send(person_docs)
 
     @backoff.on_exception(backoff.expo, Exception, )
     def _bulk_update_elastic(self, docs: List[dict]) -> Tuple[int, list]:
@@ -372,7 +419,7 @@ class ETLProcess:
         def generate_doc(docs):
             for doc in docs:
                 yield {
-                    '_index': 'movies',
+                    '_index': self.index,
                     '_id': doc['id'],
                     '_source': doc
                 }
@@ -388,7 +435,7 @@ class ETLProcess:
         docs: List[dict]
         while docs := (yield):
             docs_updated, _ = self._bulk_update_elastic(docs)
-            logger.info(f"Updated {docs_updated} documents in 'movies' index")
+            logger.info(f"Updated {docs_updated} documents in '{self.index}' index")
             time.sleep(0.5)
 
     def run(self):
@@ -422,16 +469,27 @@ if __name__ == "__main__":
     config = ETLConfig()
 
     db = PostgresDatabase(url=config.db_url)
+
     storage = RedisStorage(
-        Redis(host=config.redis_host)
+        RedisCluster(startup_nodes=[
+            {"host": "redis-node-0", "port": "6379"},
+            {"host": "redis-node-1", "port": "6380"},
+            {"host": "redis-node-2", "port": "6381"},
+            {"host": "redis-node-3", "port": "6382"},
+            {"host": "redis-node-4", "port": "6383"},
+            {"host": "redis-node-5", "port": "6384"}
+        ])
     )
+
     lookup_params = {'db': db, 'storage': storage}
 
     processes = [
-        ETLProcess(db=db, config=config, lookup=PersonLookup(**lookup_params)),
-        ETLProcess(db=db, config=config, lookup=GenreLookup(**lookup_params)),
-        ETLProcess(db=db, config=config, lookup=PersonFilmRoleLookup(**lookup_params)),
-        ETLProcess(db=db, config=config, lookup=FilmWorkLookup(**lookup_params)),
+        ETLProcess(db=db, config=config, lookup=PersonLookup(**lookup_params), index='movies'),
+        ETLProcess(db=db, config=config, lookup=GenreLookup(**lookup_params), index='movies'),
+        ETLProcess(db=db, config=config, lookup=PersonFilmRoleLookup(**lookup_params), index='movies'),
+        ETLProcess(db=db, config=config, lookup=FilmWorkLookup(**lookup_params), index='movies'),
+        ETLProcess(db=db, config=config, lookup=GenreLookup(**lookup_params, path_redis='index_genre_lookup_state'),
+                   index='genre')
     ]
 
     manager = ETLManager(processes=processes, run_once=config.run_once)
