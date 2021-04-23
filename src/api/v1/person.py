@@ -50,7 +50,7 @@ async def films_with_person(person_id: str,
     return person
 
 
-@router.get('/search?query={query}', response_model=Person)
+@router.get('/search', response_model=Person)
 async def person_search(query: str,
                         size: Optional[int] = 50,
                         page: Optional[int] = 1,
