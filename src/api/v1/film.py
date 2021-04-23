@@ -16,7 +16,6 @@ class FilmShort(BaseModel):
     rating: Optional[float] = 0
 
 
-
 @router.get("/", response_model=FilmShort)
 async def film_sort_filter(sort: Optional[str] = '-rating',
                            filter: Optional[uuid.UUID] = None,
@@ -70,6 +69,3 @@ async def film_search(query: str,
                              rating=film.rating) for film in films]
 
     return films_short
-
-
-

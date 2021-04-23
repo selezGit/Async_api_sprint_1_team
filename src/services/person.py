@@ -6,6 +6,7 @@ from db.elastic import get_elastic
 from db.redis import get_redis
 from elasticsearch import AsyncElasticsearch, exceptions
 from fastapi import Depends
+from models.film import Film
 from models.person import Person
 
 from services.base import BaseService
@@ -36,11 +37,25 @@ class PersonService(BaseService):
         return data
 
     async def get_all(self,
+                      data_id: str,
                       *args,
                       **kwargs
-                      ) -> Any:
-        """Получить все объекты в отсортированном виде"""
-        pass
+                      ) -> Optional[List[Film]]:
+        """Получить все объекты"""
+
+        filter = kwargs.get('filter')
+        size = kwargs.get('size')
+        page = kwargs.get('page')
+
+        data = await self._check_cache(f'{data_id}:{filter}:{page}:{size}:film_key')
+        if not data:
+            data = await self._get_data_from_elastic(data_id, {'filter': filter, 'size': size, 'page': page})
+            if not data:
+                return None
+
+            await self._load_cache(f'{data_id}:{filter}:{size}:{page}:film_key', data)
+
+        return data
 
     async def _get_data_from_elastic(self,
                                      data_id,
@@ -56,24 +71,25 @@ class PersonService(BaseService):
             # если что то из этого есть,
             # значит запрос был сделан с параметрами
             try:
-                query = {
-                    'size': size,
-                    'from': (page - 1) * size,
-                    "query": {
-                        "bool": {
-                            "must": {
-                                "multi_match": {
-                                    "type": "best_fields",
-                                    "query": data_id,
-                                    "fuzziness": "auto",
-                                    "fields": [
-                                        "full_name",
-                                    ]
+                if page:
+                    query = {
+                        'size': size,
+                        'from': (page - 1) * size,
+                        "query": {
+                            "bool": {
+                                "must": {
+                                    "multi_match": {
+                                        "type": "best_fields",
+                                        "query": data_id,
+                                        "fuzziness": "auto",
+                                        "fields": [
+                                            "full_name",
+                                        ]
+                                    }
                                 }
                             }
                         }
                     }
-                }
 
                 doc = await self.elastic.search(index='persons', body=query)
             except exceptions.NotFoundError:

@@ -16,6 +16,7 @@ class BaseService:
         """Получить все объекты в отсортированном виде"""
         pass
 
+    @abc.abstractmethod
     async def _get_data_from_elastic(self, *args, **kwargs):
         """Функция поиска объекта в elasticsearch по data_id или параметрам."""
         pass

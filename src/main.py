@@ -1,16 +1,13 @@
 import logging
 
+import aioredis_cluster
 import uvicorn as uvicorn
 from elasticsearch import AsyncElasticsearch
 from fastapi import FastAPI
 from fastapi.responses import ORJSONResponse
-
 from fastapi_pagination import add_pagination
-import aioredis_cluster
 
-from api.v1 import film
-from api.v1 import genre
-from api.v1 import person
+from api.v1 import film, genre, person
 from core import config
 from core.logger import LOGGING
 from db import elastic, redis
@@ -25,6 +22,7 @@ app = FastAPI(
 
 # добавляем пагинацию нашему api
 add_pagination(app)
+
 
 @app.on_event('startup')
 async def startup():

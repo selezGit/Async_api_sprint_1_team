@@ -48,7 +48,6 @@ class GenreService(BaseService):
 
         data = await self._check_cache(f'{category}:{filter}:{page}:{size}:key')
         if not data:
-            # TODO
             data = await self._get_data_from_elastic(category, {'filter': filter, 'size': size, 'page': page})
             if not data:
                 return None
@@ -71,7 +70,8 @@ class GenreService(BaseService):
             # если что то из этого есть,
             # значит запрос был сделан с параметрами
             try:
-                query = {'size': size, 'from': (page - 1) * size}
+                if page:
+                    query = {'size': size, 'from': (page - 1) * size}
                 doc = await self.elastic.search(index='genres', body=query)
             except exceptions.NotFoundError:
                 print('index not found')
