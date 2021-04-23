@@ -28,14 +28,13 @@ RUN mkdir -p /home/app
 RUN addgroup --system app && adduser --system --no-create-home --group app
 # RUN chown -R app:app /usr/src/app && chmod -R 755 /usr/src/app
 
-# create the appropriate directories
-ENV HOME=/home/app
-WORKDIR $HOME
 
 # copy project
-COPY . $HOME
+COPY . .
 
-RUN chmod +x /home/app/entrypoint.sh
+RUN chmod +x /usr/src/app/entrypoint.sh
 
 # # run entrypoint.sh
-ENTRYPOINT ["/home/app/entrypoint.sh"]
+ENTRYPOINT ["/usr/src/app/entrypoint.sh"]
+
+CMD uvicorn main:app --reload --workers 1 --host 0.0.0.0 --port 8000
