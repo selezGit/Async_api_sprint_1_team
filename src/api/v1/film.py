@@ -50,7 +50,7 @@ async def film_details(film_id: str,
     return film
 
 
-@router.get('/search?query={query}', response_model=FilmShort)
+@router.get('/search', response_model=FilmShort)
 async def film_search(query: str,
                       size: Optional[int] = 50,
                       page: Optional[int] = 1,

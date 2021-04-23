@@ -54,7 +54,7 @@
           }
         }
       },
-       "roles": {
+       "role": {
         "type": "text",
         "analyzer": "ru_en"
       },
