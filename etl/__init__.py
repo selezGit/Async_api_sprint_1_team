@@ -535,6 +535,7 @@ if __name__ == "__main__":
             {"host": "redis-node-5", "port": "6384"}
         ])
 
+    # если нужно сбросить кэш
     # redis.flushdb()
 
     storage = RedisStorage(
