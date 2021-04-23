@@ -1,9 +1,8 @@
-import uuid
 from typing import Optional
 
 import orjson
 # Используем pydantic для упрощения работы при перегонке данных из json в объекты
-from pydantic import BaseModel
+from pydantic import BaseModel, UUID4
 
 
 def orjson_dumps(v, *, default):
@@ -12,7 +11,7 @@ def orjson_dumps(v, *, default):
 
 
 class Genre(BaseModel):
-    id: uuid.UUID
+    id: UUID4
     name: str
     description: Optional[str] = ''
 
