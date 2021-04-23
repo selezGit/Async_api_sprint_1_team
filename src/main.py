@@ -15,8 +15,8 @@ from db import elastic, redis
 
 app = FastAPI(
     title=config.PROJECT_NAME,
-    docs_url='/api/openapi',
-    openapi_url='/api/openapi.json',
+    docs_url='/docs',
+    openapi_url='/api/v1/openapi.json',
     default_response_class=ORJSONResponse,
     version="0.1"
 )
