@@ -16,6 +16,29 @@ class FilmShort(BaseModel):
     rating: Optional[float] = 0
 
 
+@router.get("/", response_model=FilmShort)
+async def film_sort_filter(sort: Optional[str] = '-rating',
+                           filter: Optional[uuid.UUID] = None,
+                           size: Optional[int] = 50,
+                           page: Optional[int] = 1,
+                           film_service: FilmService = Depends(
+                               get_film_service)
+                           ) -> Optional[List[FilmShort]]:
+    """Возвращает короткую информацию по всем фильмам, отсортированным по рейтингу,
+     есть возможность фильтровать фильмы по id жанров"""
+
+    films = await film_service.get_by_param(sort, filter, page, size)
+
+    if not films:
+        raise HTTPException(status_code=HTTPStatus.NOT_FOUND,
+                            detail='film not found')
+
+    films_short = [FilmShort(id=film.id, title=film.title,
+                             rating=film.rating) for film in films]
+
+    return films_short
+
+
 @router.get('/{film_id}', response_model=Film)
 async def film_details(film_id: str,
                        film_service: FilmService = Depends(get_film_service)) -> Film:
@@ -37,28 +60,6 @@ async def film_search(query: str,
     по одному или нескольким фильмам"""
 
     films = await film_service.get_by_search(query, page, size)
-
-    if not films:
-        raise HTTPException(status_code=HTTPStatus.NOT_FOUND,
-                            detail='film not found')
-
-    films_short = [FilmShort(id=film.id, title=film.title,
-                             rating=film.rating) for film in films]
-
-    return films_short
-
-
-@router.get("/", response_model=FilmShort)
-async def film_sort_filter(sort: Optional[str] = '-rating',
-                           filter: Optional[uuid.UUID] = None,
-                           size: Optional[int] = 50,
-                           page: Optional[int] = 1,
-                           film_service: FilmService = Depends(
-                               get_film_service)
-                           ) -> Optional[List[FilmShort]]:
-    """Возвращает короткую информацию по всем фильмам, отсортированным по рейтингу"""
-
-    films = await film_service.get_by_param(sort, filter, page, size)
 
     if not films:
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND,
