@@ -27,15 +27,27 @@ class Film(BaseModel):
     id: uuid.UUID
     title: str
     description: Optional[str] = ''
-    rating: Optional[float] = 0
+    imdb_rating: Optional[float] = 0
     creation_date: datetime = datetime.now()
     restriction: Optional[int] = 0
-    directors: List[Person]
-    actors: List[Person]
-    writers: List[Person]
-    genre: List[Genre]
-    file_link: Optional[str] = ''
-    type: str
+    directors: List[Person] = []
+    actors: List[Person] = []
+    writers: List[Person] = []
+    genres: List[Genre] = []
+    file_path: Optional[str] = ''
+
+    # type: str
+
+    class Config:
+        # Заменяем стандартную работу с json на более быструю
+        json_loads = orjson.loads
+        json_dumps = orjson_dumps
+
+
+class FilmShort(BaseModel):
+    id: uuid.UUID
+    title: str
+    imdb_rating: Optional[float] = 0
 
     class Config:
         # Заменяем стандартную работу с json на более быструю
