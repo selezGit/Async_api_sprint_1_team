@@ -11,6 +11,4 @@ WORKDIR /
 
 COPY ${dir}/__init__.py /etl.py
 
-# CMD python etl.py
-
 ENTRYPOINT [ "python", "etl.py" ]
