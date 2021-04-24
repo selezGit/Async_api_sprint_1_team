@@ -1,20 +1,13 @@
-import uuid
 from http import HTTPStatus
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from models.person import Person
-from pydantic import BaseModel
+from models.film import FilmShort
 from services.film import FilmService, get_film_service
 from services.person import PersonService, get_person_service
 
 router = APIRouter()
-
-
-class FilmShort(BaseModel):
-    id: uuid.UUID
-    title: str
-    rating: Optional[float] = 0
 
 
 @router.get('/{person_id}', response_model=Person)
@@ -30,7 +23,7 @@ async def person_details(person_id: str,
     return person
 
 
-@router.get('/{person_id}/films', response_model=Person)
+@router.get('/{person_id}/films', response_model=List[FilmShort])
 async def films_with_person(person_id: str,
                             size: Optional[int] = 50,
                             page: Optional[int] = 1,
@@ -45,12 +38,12 @@ async def films_with_person(person_id: str,
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND,
                             detail='person not found')
 
-    films = await film_service.get_by_list_id(person.id, person.ids, page, size)
+    films = await film_service.get_by_list_id(person_id=person['id'], film_ids=person['film_ids'], page=page, size=size)
 
-    return person
+    return films
 
 
-@router.get('/search', response_model=Person)
+@router.get('/', response_model=List[Person])
 async def person_search(query: str,
                         size: Optional[int] = 50,
                         page: Optional[int] = 1,
@@ -60,16 +53,10 @@ async def person_search(query: str,
     """Возвращает информацию 
     по одному или нескольким персонам"""
 
-    persons = await person_service.get_by_search(query, page, size)
+    persons = await person_service.get_by_search(q=query, page=page, size=size)
 
     if not persons:
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND,
                             detail='person not found')
-
-    persons = [Person(id=person.id,
-                      full_name=person.full_name,
-                      role=person.role,
-                      film_ids=person.film_ids,
-                      rating=person.rating) for person in persons]
 
     return persons
