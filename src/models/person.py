@@ -1,9 +1,8 @@
-import uuid
 from typing import List, Optional
 
 import orjson
 # Используем pydantic для упрощения работы при перегонке данных из json в объекты
-from pydantic import BaseModel
+from pydantic import BaseModel, UUID4
 
 
 def orjson_dumps(v, *, default):
@@ -12,10 +11,10 @@ def orjson_dumps(v, *, default):
 
 
 class Person(BaseModel):
-    id: uuid.UUID
+    id: UUID4
     full_name: str
-    role: str
-    film_ids: Optional[List[uuid.UUID]]  # возможно тут будет косяк, проверить!
+    role: List[str]
+    film_ids: Optional[List[UUID4]]  # возможно тут будет косяк, проверить!
 
     class Config:
         # Заменяем стандартную работу с json на более быструю
