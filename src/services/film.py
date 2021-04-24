@@ -123,21 +123,17 @@ class FilmService(BaseService):
                 query['query'] = {
                     "bool": {
                         "filter": {
-                            "nested": {
-                                "path": "genres",
-                                "query": {
-                                    "bool": {
-                                        "must": {
-                                            "match": {
-                                                "genres.id": genre
-                                            }
-                                        }
+                            "bool": {
+                                "should": {
+                                    "match_phrase": {
+                                        "genres.id": genre
                                     }
                                 }
                             }
                         }
                     }
                 }
+
             if q:
                 _query = query.setdefault("query", dict())
                 _bool = _query.setdefault("bool", dict())

@@ -285,7 +285,7 @@ class ETLProcess:
     def extract(self):
         pass
 
-    # @backoff.on_exception(backoff.expo, Exception, )
+    @backoff.on_exception(backoff.expo, Exception, )
     def _bulk_update_elastic(self, docs: List[dict]) -> Tuple[int, list]:
         elastic_settings = dict(
             hosts=self.config.elasticsearch_hosts,
