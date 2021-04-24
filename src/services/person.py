@@ -11,6 +11,7 @@ from models.person import Person
 
 from services.base import BaseService
 
+import logging
 
 class PersonService(BaseService):
     def __init__(self,
@@ -25,14 +26,14 @@ class PersonService(BaseService):
                         **kwargs
                         ) -> Optional[Person]:
         """Получить объект по uuid"""
-
-        data = await self._check_cache(data_id, data_type='dict')
+        key = f'person:{data_id}:key'
+        data = await self._check_cache(key, )
         if not data:
             data = await self._get_data_from_elastic(data_id)
             if not data:
                 return None
 
-            await self._load_cache(data_id, data)
+            await self._load_cache(key, data)
 
         return data
 
@@ -46,19 +47,19 @@ class PersonService(BaseService):
         filter = kwargs.get('filter')
         size = kwargs.get('size')
         page = kwargs.get('page')
-
-        data = await self._check_cache(f'{data_id}:{filter}:{page}:{size}:film_key')
+        key = f'persons:{data_id}:{filter}:{page}:{size}'
+        data = await self._check_cache(key)
         if not data:
-            data = await self._get_data_from_elastic(data_id, {'filter': filter, 'size': size, 'page': page})
+            data = await self._get_data_from_elastic(data_id, **{'filter': filter, 'size': size, 'page': page})
             if not data:
                 return None
 
-            await self._load_cache(f'{data_id}:{filter}:{size}:{page}:film_key', data)
+            await self._load_cache(key, data)
 
         return data
 
     async def _get_data_from_elastic(self,
-                                     data_id,
+                                     data_id=None,
                                      *args,
                                      **kwargs
                                      ) -> Optional[List[Person]]:
@@ -66,8 +67,9 @@ class PersonService(BaseService):
 
         size = kwargs.get('size')
         page = kwargs.get('page')
+        q = kwargs.get('q')
 
-        if bool(bool(size)+bool(page)):
+        if bool(bool(size) + bool(page)):
             # если что то из этого есть,
             # значит запрос был сделан с параметрами
             try:
@@ -77,23 +79,20 @@ class PersonService(BaseService):
                         'from': (page - 1) * size,
                         "query": {
                             "bool": {
-                                "must": {
-                                    "multi_match": {
-                                        "type": "best_fields",
-                                        "query": data_id,
-                                        "fuzziness": "auto",
-                                        "fields": [
-                                            "full_name",
-                                        ]
+                                "must": [
+                                    {
+                                        "match": {
+                                            "full_name": q
+                                        }
                                     }
-                                }
+                                ]
                             }
                         }
                     }
-
                 doc = await self.elastic.search(index='persons', body=query)
+
             except exceptions.NotFoundError:
-                print('index not found')
+                logging.debug('index not found')
                 return None
 
             if not doc:
@@ -103,19 +102,18 @@ class PersonService(BaseService):
             if not result:
                 return None
 
-            return [Person(**person['_source']) for person in result]
+            return [person['_source'] for person in result]
 
         else:
             # если параметров не было, значит ищем по id
             try:
                 result = await self.elastic.get('persons', data_id)
-                return Person(**result['_source'])
+                return result['_source']
 
             except exceptions.NotFoundError:
                 return None
 
     async def get_by_search(self,
-                            data_id: str,
                             page: int,
                             size: int,
                             *args,
@@ -123,16 +121,14 @@ class PersonService(BaseService):
                             ) -> Optional[List[Person]]:
         """Найти объект(ы) по ключевому слову"""
 
-        filter = kwargs.get('filter')
-
-        data = await self._check_cache(f'{data_id}:{filter}:{page}:{size}:key')
-
+        q = kwargs.get('q')
+        key = f'persons:{q}:{page}:{size}'
+        data = await self._check_cache(key)
         if not data:
-            data = await self._get_data_from_elastic(data_id, {'page': page, 'size': size})
+            data = await self._get_data_from_elastic(page=page, size=size, q=q)
             if not data:
                 return None
-
-            await self._load_cache(f'{data_id}:{filter}:{page}:{size}:key', data)
+            await self._load_cache(key, data)
 
         return data
 
@@ -142,38 +138,6 @@ class PersonService(BaseService):
                            ) -> Any:
         """Получить объекты по параметрам"""
         pass
-
-    async def _check_cache(self,
-                           data_id: str,
-                           data_type: Optional[str] = 'list'
-                           ) -> Optional[Any]:
-        """Найти обьекты в кэше."""
-
-        if data_type == 'dict':
-            # если запрос словаря, значит нужен поиск по id
-            result = await self.redis.get(data_id, )
-            return result
-        else:
-            # если несколько элементов, то поиск по списку
-            result = await self.redis.lrange(data_id, 0, -1)
-            if not result:
-                return None
-
-            data = [Person.parse_raw(person) for person in result]
-            return data
-
-    async def _load_cache(self,
-                          data_id: str,
-                          data: Any) -> None:
-        """Запись объектов в кэш."""
-
-        if isinstance(data, dict):
-            await self.redis.set(data_id, data, ttl=self.FILM_CACHE_EXPIRE_IN_SECONDS)
-        elif isinstance(data, list):
-            await self.redis.lpush(data_id, [object.json() for object in data],
-                                   expire=self.FILM_CACHE_EXPIRE_IN_SECONDS)
-        else:
-            print(f'failed load data: {data_id}')
 
 
 @lru_cache()
