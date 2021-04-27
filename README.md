@@ -40,18 +40,25 @@ SQL_PORT=5432
 DATABASE=postgres
 ```
 
+**[ elasticsearch ]**
+ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+
+**[ redis ]**
+REDIS_HOST=redis
+
+
 ## Запуск
 
 Для запуска докер контейнеров я использовал 2 файла, в одном все сервисы кроме редиса, во втором всё что относится к кластеру редис, в корне проекта выполняем:
 
 Билд + запуск:
 
-    $ docker-compose -f docker-compose.yml -f compose-redis-cluster.yml up -d --build
+    $ sudo docker-compose -f docker-compose.yml -f compose-redis-cluster.yml up -d --build
 
 Только запуск:
 
-    $ docker-compose -f docker-compose.yml -f compose-redis-cluster.yml up --d
+    $ sudo docker-compose -f docker-compose.yml -f compose-redis-cluster.yml up --d
 
 Остановка:
 
-    $ docker-compose -f docker-compose.yml -f compose-redis-cluster.yml down
+    $ sudo docker-compose -f docker-compose.yml -f compose-redis-cluster.yml down

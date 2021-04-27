@@ -1,3 +1,4 @@
+from enum import Enum
 from http import HTTPStatus
 from typing import List, Optional
 
@@ -8,8 +9,13 @@ from services.film import FilmService, get_film_service
 router = APIRouter()
 
 
+class Order(str, Enum):
+    desc = 'DESC'
+    asc = 'ASC'
+
+
 @router.get("/", response_model=List[Film])
-async def film_sort_filter(sort: Optional[str] = '-rating',
+async def film_sort_filter(order: Optional[Order] = Order.desc,
                            genre: Optional[str] = None,
                            size: Optional[int] = 50,
                            page: Optional[int] = 1,
@@ -20,7 +26,7 @@ async def film_sort_filter(sort: Optional[str] = '-rating',
     """Возвращает короткую информацию по всем фильмам, отсортированным по рейтингу,
      есть возможность фильтровать фильмы по id жанров"""
 
-    films = await film_service.get_by_param(sort=sort, genre=genre, page=page, size=size, query=query)
+    films = await film_service.get_by_param(order=order, genre=genre, page=page, size=size, query=query)
 
     if not films:
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND,
@@ -38,4 +44,3 @@ async def film_details(film_id: str,
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND,
                             detail='film not found')
     return film
-

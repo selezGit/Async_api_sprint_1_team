@@ -2,6 +2,7 @@
 import abc
 import json
 from typing import Any, Optional
+import backoff
 
 
 class BaseService:
@@ -32,6 +33,7 @@ class BaseService:
         """Получить объекты по параметрам"""
         pass
 
+    @backoff.on_exception(backoff.expo, Exception)
     async def _check_cache(self,
                            data_id: str,
                            ) -> Optional[Any]:
@@ -41,6 +43,7 @@ class BaseService:
             result = json.loads(result)
         return result
 
+    @backoff.on_exception(backoff.expo, Exception)
     async def _load_cache(self,
                           data_id: str,
                           data: Any):

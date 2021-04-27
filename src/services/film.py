@@ -1,6 +1,8 @@
+import logging
 from functools import lru_cache
-from typing import Any, List, Optional, Dict
+from typing import Dict, List, Optional
 
+import backoff
 from aioredis import Redis
 from db.elastic import get_elastic
 from db.redis import get_redis
@@ -9,8 +11,6 @@ from fastapi import Depends
 from models.film import Film
 
 from services.base import BaseService
-
-import logging
 
 
 class FilmService(BaseService):
@@ -54,6 +54,7 @@ class FilmService(BaseService):
 
         return data
 
+    @backoff.on_exception(backoff.expo, Exception)
     async def _get_data_with_list_film(self, film_ids: List[str], page: int, size: int):
         query = {
             "size": size,
@@ -75,7 +76,7 @@ class FilmService(BaseService):
         try:
             doc = await self.elastic.search(index='movies', body=query)
         except exceptions.NotFoundError:
-            print('index not found')
+            logging.error('index not found')
             return None
 
         if not doc:
@@ -86,8 +87,9 @@ class FilmService(BaseService):
             return None
         return [film['_source'] for film in result]
 
+    @backoff.on_exception(backoff.expo, Exception)
     async def _get_data_from_elastic(self,
-                                     data_id=None,
+                                     data_id: Optional[str] = None,
                                      *args,
                                      **kwargs
                                      ) -> Optional[List[Film]]:
@@ -96,25 +98,19 @@ class FilmService(BaseService):
         genre = kwargs.get('genre')
         size = kwargs.get('size')
         page = kwargs.get('page')
-        sort = kwargs.get('sort')
+        order = kwargs.get('order')
         q = kwargs.get('query')
 
-        if bool(bool(size) + bool(page) + bool(genre)):
+        if any([size, page, genre, order, q]):
             # если что то из этого есть,
             # значит запрос был сделан с параметрами
 
             query = {'size': size, 'from': (page - 1) * size}
 
-            if sort:
-                if sort[0] == '-':
-                    order = "DESC"
-
-                else:
-                    order = "ASC"
-                sort = 'imdb_rating'
+            if order:
 
                 query['sort'] = {
-                    sort: {
+                    "imdb_rating": {
                         "order": order
                     }
                 }
@@ -159,7 +155,7 @@ class FilmService(BaseService):
                 logging.info(query)
                 doc = await self.elastic.search(index='movies', body=query)
             except exceptions.NotFoundError:
-                print('index not found')
+                logging.error('index not found')
                 return None
 
             if not doc:
@@ -181,20 +177,19 @@ class FilmService(BaseService):
                 return None
 
     async def get_by_param(self,
-                           sort: str,
+                           order: str,
                            page: int,
                            size: int,
                            genre: str = None,
                            query: str = None
                            ) -> Optional[List[Film]]:
-        """Функция получения всех фильмов с параметрами сортфировки\фильтрации"""
-        key = f'{sort}:{genre}:{query}:{page}:{size}:key'
-        # films = await self._check_cache(key)
+        """Функция получения всех фильмов с параметрами сортфировки и фильтрации"""
+        key = f'{order}:{genre}:{query}:{page}:{size}:key'
         films = False
         if not films:
 
             films = await self._get_data_from_elastic(
-                **{'genre': genre, 'page': page, 'size': size, 'sort': sort, 'query': query})
+                **{'genre': genre, 'page': page, 'size': size, 'order': order, 'query': query})
             if not films:
                 return None
 

@@ -50,7 +50,7 @@ async def person_search(query: str,
                         person_service: PersonService = Depends(
                             get_person_service)
                         ) -> List[Person]:
-    """Возвращает информацию 
+    """Возвращает информацию
     по одному или нескольким персонам"""
 
     persons = await person_service.get_by_search(q=query, page=page, size=size)

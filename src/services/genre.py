@@ -1,6 +1,8 @@
+import logging
 from functools import lru_cache
-from typing import Any, List, Optional, Dict
+from typing import Dict, List, Optional
 
+import backoff
 from aioredis import Redis
 from db.elastic import get_elastic
 from db.redis import get_redis
@@ -8,11 +10,7 @@ from elasticsearch import AsyncElasticsearch, exceptions
 from fastapi import Depends
 from models.genre import Genre
 
-import json
-
 from services.base import BaseService
-
-import logging
 
 
 class GenreService(BaseService):
@@ -57,9 +55,10 @@ class GenreService(BaseService):
                 return None
 
             await self._load_cache(key, data)
-        
+
         return data
 
+    @backoff.on_exception(backoff.expo, Exception)
     async def _get_data_from_elastic(self,
                                      data_id=None,
                                      *args,

@@ -7,3 +7,4 @@ uvicorn==0.13.4
 aioredis-cluster==1.5.2
 orjson==3.3.1
 fastapi-pagination==0.7.0
+backoff==1.10.0

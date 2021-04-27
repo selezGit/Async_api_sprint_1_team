@@ -6,7 +6,7 @@ services:
     volumes:
       - ./src:/usr/src/app
     ports:
-      - 8000:8000
+      - 127.0.0.1:8000:8000
     depends_on: 
       - db
       - elasticsearch
@@ -16,7 +16,7 @@ services:
     image: postgres:12.0-alpine
     env_file:
       - ./.env
-    ports:
+    ports: 
       - 5432:5432
     volumes:
       - ./.pg-data:/var/lib/postgresql/data/
@@ -34,7 +34,7 @@ services:
     volumes:
       - ./.es-data:/usr/share/elasticsearch/data
     ports:
-      - 9200:9200
+      - 127.0.0.1:9200:9200
     restart: always
 
     networks:
@@ -42,7 +42,7 @@ services:
   kibana:
     image: docker.elastic.co/kibana/kibana:7.7.0
     ports:
-      - "5601:5601"
+      - 127.0.0.1:5601:5601
     depends_on:
       - elasticsearch
     env_file:

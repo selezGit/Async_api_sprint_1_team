@@ -1,18 +1,18 @@
-from functools import wraps
-from typing import Dict, Any, List, Generator, Tuple
-from dataclasses import dataclass
 import abc
+import json
+import logging
+import os
+import time
+from dataclasses import dataclass
+from functools import wraps
+from typing import Any, Dict, Generator, List, Tuple
 
+import backoff
+import coloredlogs
 import psycopg2
 import psycopg2.extras
-import backoff
-import time
-import logging
-import coloredlogs
-import os
-import json
-from pydantic import BaseSettings
 from elasticsearch import Elasticsearch, helpers
+from pydantic import BaseSettings
 from redis import Redis
 from rediscluster import RedisCluster
 
@@ -137,7 +137,8 @@ class Lookup:
             while True and batch_num == 0:
 
                 state = self.state
-                last_updated_at = state.get_key('last_updated_at') or last_updated_at
+                last_updated_at = state.get_key(
+                    'last_updated_at') or last_updated_at
                 last_id = state.get_key('last_id')
 
                 if column_return:
@@ -152,7 +153,7 @@ class Lookup:
                     +
                     f'''
                     WHERE  {modified} = %(last_updated_at)s and id > %(last_id)s::uuid
-                    or {modified} > %(last_updated_at)s 
+                    or {modified} > %(last_updated_at)s
                     ''' * bool(last_updated_at)
                     + f'''
                     ORDER BY {modified}, id
@@ -165,7 +166,8 @@ class Lookup:
                 )
                 time.sleep(0.5)
                 if not modified_rows:
-                    logger.info(f'No updated rows in {table} since {last_updated_at}')
+                    logger.info(
+                        f'No updated rows in {table} since {last_updated_at}')
                     break
                 first, last = modified_rows[0], modified_rows[-1]
                 logger.info(
@@ -176,7 +178,8 @@ class Lookup:
                     f"        {last['id']} (at {last[modified]})"
                 )
                 if column_return:
-                    results_: List[str] = [row[column_return] for row in modified_rows]
+                    results_: List[str] = [row[column_return]
+                                           for row in modified_rows]
                 else:
                     results_: List[str] = [row["id"] for row in modified_rows]
 
@@ -191,7 +194,8 @@ class Lookup:
 @dataclass
 class PersonLookupPersonETL(Lookup):
     def produce(self, target: Generator):
-        get_updated_persons = self.get_updated_rows('content.person', 'modified')
+        get_updated_persons = self.get_updated_rows(
+            'content.person', 'modified')
         get_updated_persons(
             target=target
         )
@@ -200,7 +204,8 @@ class PersonLookupPersonETL(Lookup):
 @dataclass
 class PersonLookup(Lookup):
     def produce(self, target: Generator):
-        get_updated_persons = self.get_updated_rows('content.person', 'modified')
+        get_updated_persons = self.get_updated_rows(
+            'content.person', 'modified')
         get_updated_persons(
             self._get_person_films(
                 target=target
@@ -230,7 +235,8 @@ class PersonLookup(Lookup):
 @dataclass
 class PersonFilmRoleLookup(Lookup):
     def produce(self, target: Generator):
-        get_updated_person_role = self.get_updated_rows('content.person_film_role', 'modified', column_return='film_id')
+        get_updated_person_role = self.get_updated_rows(
+            'content.person_film_role', 'modified', column_return='film_id')
         get_updated_person_role(
             target
         )
@@ -239,7 +245,8 @@ class PersonFilmRoleLookup(Lookup):
 @dataclass
 class GenreLookup(Lookup):
     def produce(self, target: Generator):
-        get_updated_person_role = self.get_updated_rows('content.genre', 'modified')
+        get_updated_person_role = self.get_updated_rows(
+            'content.genre', 'modified')
         get_updated_person_role(
             self._get_updated_genre_films(
                 target
@@ -268,7 +275,8 @@ class GenreLookup(Lookup):
 @dataclass
 class FilmWorkLookup(Lookup):
     def produce(self, target: Generator):
-        get_update_film_work = self.get_updated_rows('content.film_work', 'modified')
+        get_update_film_work = self.get_updated_rows(
+            'content.film_work', 'modified')
         get_update_film_work(
             target=target
         )
@@ -313,7 +321,8 @@ class ETLProcess:
         docs: List[dict]
         while docs := (yield):
             docs_updated, _ = self._bulk_update_elastic(docs)
-            logger.info(f"Updated {docs_updated} documents in '{self.index}' index")
+            logger.info(
+                f"Updated {docs_updated} documents in '{self.index}' index")
             time.sleep(0.5)
 
     def run(self):
@@ -335,16 +344,16 @@ class ETLProcessPerson(ETLProcess):
         while person_ids := (yield):
             persons: List[dict] = self.db.query(
                 '''
-                SELECT 
-                    person.id, 
-                    person.full_name, 
+                SELECT
+                    person.id,
+                    person.full_name,
                     role.role AS roles
-	            FROM content.person person 
+	            FROM content.person person
 	            LEFT JOIN LATERAL (
-	                SELECT 
-	                    pfr.person_id, 
-	                    array_agg(jsonb_build_object('id', pfr.film_id, 'role', pfr.role)) AS role 
-	                FROM content.person_film_role pfr 
+	                SELECT
+	                    pfr.person_id,
+	                    array_agg(jsonb_build_object('id', pfr.film_id, 'role', pfr.role)) AS role
+	                FROM content.person_film_role pfr
 	                where person.id=pfr.person_id group by person_id
 	                ) AS role ON role.person_id=person.id
                 WHERE person.id = ANY(%(person_ids)s::uuid[]);
@@ -389,7 +398,7 @@ class ETLProcessFilmWork(ETLProcess):
         while film_ids := (yield):
             films: List[dict] = self.db.query(
                 '''
-                SELECT 
+                SELECT
                     fw.id AS id,
                     fw.title,
                     fw.description,
@@ -399,24 +408,24 @@ class ETLProcessFilmWork(ETLProcess):
                     fwg.genres
                 FROM "content".film_work fw
 				INNER JOIN content.film_work_type fwt on fwt.id=fw.type_id
-                LEFT JOIN LATERAL ( 
-                    SELECT 
+                LEFT JOIN LATERAL (
+                    SELECT
                         pfw.film_id,
                         array_agg(jsonb_build_object(
-                            'id', p.id, 
-                            'full_name', p.full_name, 
+                            'id', p.id,
+                            'full_name', p.full_name,
                             'role', pfw.role
                         )) AS persons
                     FROM "content".person_film_role pfw
                     JOIN "content".person p ON p.id = pfw.person_id
                     WHERE pfw.film_id = fw.id
-                    GROUP BY 1 
+                    GROUP BY 1
                     ) fwp ON TRUE
-                LEFT JOIN LATERAL ( 
-                    SELECT 
+                LEFT JOIN LATERAL (
+                    SELECT
                         gfw.filmwork_id,
                         array_agg(jsonb_build_object(
-                            'id', g.id, 
+                            'id', g.id,
                             'name', g.name,
                             'description', g.description
                         )) AS genres
@@ -455,8 +464,10 @@ class ETLProcessFilmWork(ETLProcess):
                     k: v for k, v in film.items()
                     if k in ('id', 'title', 'description', 'type')
                 }
-                film_work_doc['genres_names'] = [g['name'] for g in film['genres']]
-                film_work_doc['genres'] = [{'id': g['id'], 'name': g['name']} for g in film['genres']]
+                film_work_doc['genres_names'] = [g['name']
+                                                 for g in film['genres']]
+                film_work_doc['genres'] = [
+                    {'id': g['id'], 'name': g['name']} for g in film['genres']]
 
                 film_work_doc['imdb_rating'] = film['rating']
                 film_work_doc.update({
@@ -470,8 +481,10 @@ class ETLProcessFilmWork(ETLProcess):
                 if film['persons'] is not None:
                     for person in film['persons']:
                         if person['id'] in persons_docs_raw:
-                            persons_docs_raw[person['id']]['role'].add(person['role'])
-                            persons_docs_raw[person['id']]['film_ids'].add(film['id'])
+                            persons_docs_raw[person['id']
+                                             ]['role'].add(person['role'])
+                            persons_docs_raw[person['id']
+                                             ]['film_ids'].add(film['id'])
                         else:
                             persons_docs_raw[person['id']] = {
                                 'id': person['id'],
@@ -481,19 +494,25 @@ class ETLProcessFilmWork(ETLProcess):
                             }
 
                         if person['role'] == 'director':
-                            film_work_doc['directors_names'].append(person['full_name'])
+                            film_work_doc['directors_names'].append(
+                                person['full_name'])
                             film_work_doc['directors'].append(
-                                {'id': person['id'], 'name': person['full_name']}
+                                {'id': person['id'],
+                                    'name': person['full_name']}
                             )
                         if person['role'] == 'actor':
-                            film_work_doc['actors_names'].append(person['full_name'])
+                            film_work_doc['actors_names'].append(
+                                person['full_name'])
                             film_work_doc['actors'].append(
-                                {'id': person['id'], 'name': person['full_name']}
+                                {'id': person['id'],
+                                    'name': person['full_name']}
                             )
                         if person['role'] == 'writer':
-                            film_work_doc['writers_names'].append(person['full_name'])
+                            film_work_doc['writers_names'].append(
+                                person['full_name'])
                             film_work_doc['writers'].append(
-                                {'id': person['id'], 'name': person['full_name']}
+                                {'id': person['id'],
+                                    'name': person['full_name']}
                             )
                 film_work_docs.append(film_work_doc)
             genre_docs = [genre_doc for genre_doc in genre_docs_raw.values()]
@@ -502,7 +521,6 @@ class ETLProcessFilmWork(ETLProcess):
                 target.send(genre_docs)
             elif self.index == 'movies':
                 target.send(film_work_docs)
-
 
 
 @dataclass
@@ -527,13 +545,13 @@ if __name__ == "__main__":
 
     db = PostgresDatabase(url=config.db_url)
     redis = RedisCluster(startup_nodes=[
-            {"host": "redis-node-0", "port": "6379"},
-            {"host": "redis-node-1", "port": "6380"},
-            {"host": "redis-node-2", "port": "6381"},
-            {"host": "redis-node-3", "port": "6382"},
-            {"host": "redis-node-4", "port": "6383"},
-            {"host": "redis-node-5", "port": "6384"}
-        ])
+        {"host": "redis-node-0", "port": "6379"},
+        {"host": "redis-node-1", "port": "6380"},
+        {"host": "redis-node-2", "port": "6381"},
+        {"host": "redis-node-3", "port": "6382"},
+        {"host": "redis-node-4", "port": "6383"},
+        {"host": "redis-node-5", "port": "6384"}
+    ])
 
     # если нужно сбросить кэш
     # redis.flushdb()
@@ -544,14 +562,20 @@ if __name__ == "__main__":
 
     lookup_params = {'db': db, 'storage': storage}
     processes = [
-        ETLProcessFilmWork(db=db, config=config, lookup=PersonLookup(**lookup_params), index='movies'),
-        ETLProcessFilmWork(db=db, config=config, lookup=GenreLookup(**lookup_params), index='movies'),
-        ETLProcessFilmWork(db=db, config=config, lookup=PersonFilmRoleLookup(**lookup_params), index='movies'),
-        ETLProcessFilmWork(db=db, config=config, lookup=FilmWorkLookup(**lookup_params), index='movies'),
+        ETLProcessFilmWork(db=db, config=config, lookup=PersonLookup(
+            **lookup_params), index='movies'),
+        ETLProcessFilmWork(db=db, config=config, lookup=GenreLookup(
+            **lookup_params), index='movies'),
+        ETLProcessFilmWork(db=db, config=config, lookup=PersonFilmRoleLookup(
+            **lookup_params), index='movies'),
+        ETLProcessFilmWork(db=db, config=config, lookup=FilmWorkLookup(
+            **lookup_params), index='movies'),
         ETLProcessFilmWork(db=db, config=config,
-                           lookup=GenreLookup(**lookup_params, path_redis='index_genre_lookup_state'),
+                           lookup=GenreLookup(
+                               **lookup_params, path_redis='index_genre_lookup_state'),
                            index='genre'),
-        ETLProcessPerson(db=db, config=config, lookup=PersonLookupPersonETL(**lookup_params), index='persons')
+        ETLProcessPerson(db=db, config=config, lookup=PersonLookupPersonETL(
+            **lookup_params), index='persons')
     ]
 
     manager = ETLManager(processes=processes, run_once=config.run_once)

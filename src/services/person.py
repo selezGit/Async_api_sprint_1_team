@@ -1,6 +1,8 @@
+import logging
 from functools import lru_cache
-from typing import Any, List, Optional
+from typing import List, Optional
 
+import backoff
 from aioredis import Redis
 from db.elastic import get_elastic
 from db.redis import get_redis
@@ -11,7 +13,6 @@ from models.person import Person
 
 from services.base import BaseService
 
-import logging
 
 class PersonService(BaseService):
     def __init__(self,
@@ -58,6 +59,26 @@ class PersonService(BaseService):
 
         return data
 
+    async def get_by_search(self,
+                            page: int,
+                            size: int,
+                            *args,
+                            **kwargs
+                            ) -> Optional[List[Person]]:
+        """Найти объект(ы) по ключевому слову"""
+
+        q = kwargs.get('q')
+        key = f'persons:{q}:{page}:{size}'
+        data = await self._check_cache(key)
+        if not data:
+            data = await self._get_data_from_elastic(page=page, size=size, q=q)
+            if not data:
+                return None
+            await self._load_cache(key, data)
+
+        return data
+
+    @backoff.on_exception(backoff.expo, Exception)
     async def _get_data_from_elastic(self,
                                      data_id=None,
                                      *args,
@@ -112,32 +133,6 @@ class PersonService(BaseService):
 
             except exceptions.NotFoundError:
                 return None
-
-    async def get_by_search(self,
-                            page: int,
-                            size: int,
-                            *args,
-                            **kwargs
-                            ) -> Optional[List[Person]]:
-        """Найти объект(ы) по ключевому слову"""
-
-        q = kwargs.get('q')
-        key = f'persons:{q}:{page}:{size}'
-        data = await self._check_cache(key)
-        if not data:
-            data = await self._get_data_from_elastic(page=page, size=size, q=q)
-            if not data:
-                return None
-            await self._load_cache(key, data)
-
-        return data
-
-    async def get_by_param(self,
-                           *args,
-                           **kwargs
-                           ) -> Any:
-        """Получить объекты по параметрам"""
-        pass
 
 
 @lru_cache()
