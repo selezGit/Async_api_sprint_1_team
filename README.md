@@ -41,11 +41,13 @@ DATABASE=postgres
 ```
 
 **[ elasticsearch ]**
+```
 ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-
+```
 **[ redis ]**
+```
 REDIS_HOST=redis
-
+```
 
 ## Запуск
 
