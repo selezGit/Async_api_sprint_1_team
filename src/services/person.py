@@ -8,7 +8,6 @@ from db.elastic import get_elastic
 from db.redis import get_redis
 from elasticsearch import AsyncElasticsearch, exceptions
 from fastapi import Depends
-from models.film import Film
 from models.person import Person
 
 from services.base import BaseService
@@ -22,44 +21,24 @@ class PersonService(BaseService):
         self.elastic = elastic
 
     async def get_by_id(self,
+                        url: str,
                         data_id: str,
                         *args,
                         **kwargs
                         ) -> Optional[Person]:
         """Получить объект по uuid"""
-        key = f'person:{data_id}:key'
-        data = await self._check_cache(key, )
+        data = await self._check_cache(url)
         if not data:
             data = await self._get_data_from_elastic(data_id)
             if not data:
                 return None
 
-            await self._load_cache(key, data)
-
-        return data
-
-    async def get_all(self,
-                      data_id: str,
-                      *args,
-                      **kwargs
-                      ) -> Optional[List[Film]]:
-        """Получить все объекты"""
-
-        filter = kwargs.get('filter')
-        size = kwargs.get('size')
-        page = kwargs.get('page')
-        key = f'persons:{data_id}:{filter}:{page}:{size}'
-        data = await self._check_cache(key)
-        if not data:
-            data = await self._get_data_from_elastic(data_id, **{'filter': filter, 'size': size, 'page': page})
-            if not data:
-                return None
-
-            await self._load_cache(key, data)
+            await self._load_cache(url, data)
 
         return data
 
     async def get_by_search(self,
+                            url: str,
                             page: int,
                             size: int,
                             *args,
@@ -68,13 +47,12 @@ class PersonService(BaseService):
         """Найти объект(ы) по ключевому слову"""
 
         q = kwargs.get('q')
-        key = f'persons:{q}:{page}:{size}'
-        data = await self._check_cache(key)
+        data = await self._check_cache(url)
         if not data:
             data = await self._get_data_from_elastic(page=page, size=size, q=q)
             if not data:
                 return None
-            await self._load_cache(key, data)
+            await self._load_cache(url, data)
 
         return data
 

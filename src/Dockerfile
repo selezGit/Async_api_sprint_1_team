@@ -38,3 +38,7 @@ RUN chmod +x /usr/src/app/entrypoint.sh
 ENTRYPOINT ["/usr/src/app/entrypoint.sh"]
 
 CMD uvicorn main:app --reload --workers 1 --host 0.0.0.0 --port 8000
+
+
+#CMD gunicorn main:app --bind 0.0.0.0:8000 -k uvicorn.workers.UvicornWorker
+    

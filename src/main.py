@@ -16,8 +16,9 @@ app = FastAPI(
     title=config.PROJECT_NAME,
     docs_url='/docs',
     openapi_url='/api/v1/openapi.json',
+    description='Информация о фильмах, жанрах и людях участвоваших в создании произведения',
     default_response_class=ORJSONResponse,
-    version="0.1"
+    version='1.0.0'
 )
 
 # добавляем пагинацию нашему api
@@ -44,9 +45,9 @@ async def shutdown():
 
 # Подключаем роутер к серверу, указав префикс /v1/film
 # Теги указываем для удобства навигации по документации
-app.include_router(film.router, prefix='/api/v1/film', tags=['film'])
-app.include_router(genre.router, prefix='/api/v1/genre', tags=['genre'])
-app.include_router(person.router, prefix='/api/v1/person', tags=['person'])
+app.include_router(film.router, prefix='/api/v1/film', tags=['Фильмы'])
+app.include_router(genre.router, prefix='/api/v1/genre', tags=['Жанры'])
+app.include_router(person.router, prefix='/api/v1/person', tags=['Люди'])
 
 if __name__ == '__main__':
     uvicorn.run(

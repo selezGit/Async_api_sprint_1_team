@@ -21,24 +21,26 @@ class GenreService(BaseService):
         self.elastic = elastic
 
     async def get_by_id(self,
+                        url: str,
                         data_id: str,
                         *args,
                         **kwargs
                         ) -> Optional[Genre]:
         """Получить объект по uuid"""
-        key = f'genre:{data_id}:key'
-        data = await self._check_cache(key, )
-
+        data = await self._check_cache(url)
+        print(data)
+        print(url)
         if not data:
             data = await self._get_data_from_elastic(data_id)
             if not data:
                 return None
 
-            await self._load_cache(key, data)
+            await self._load_cache(url, data)
 
         return data
 
     async def get_all(self,
+                      url: str,
                       *args,
                       **kwargs
                       ) -> Optional[List[Genre]]:
@@ -47,14 +49,13 @@ class GenreService(BaseService):
         filter = kwargs.get('filter')
         size = kwargs.get('size')
         page = kwargs.get('page')
-        key = f'genres:{filter}:{size}:{page}:key'
-        data = await self._check_cache(key)
+        data = await self._check_cache(url)
         if not data:
             data = await self._get_data_from_elastic(**{'filter': filter, 'size': size, 'page': page})
             if not data:
                 return None
 
-            await self._load_cache(key, data)
+            await self._load_cache(url, data)
 
         return data
 

@@ -35,18 +35,19 @@ class BaseService:
 
     @backoff.on_exception(backoff.expo, Exception)
     async def _check_cache(self,
-                           data_id: str,
+                           url: str,
                            ) -> Optional[Any]:
+
         """Найти обьекты в кэше."""
-        result = await self.redis.get(data_id, )
+        result = await self.redis.get(str(url), )
         if result:
             result = json.loads(result)
         return result
 
     @backoff.on_exception(backoff.expo, Exception)
     async def _load_cache(self,
-                          data_id: str,
+                          url: str,
                           data: Any):
         """Запись объектов в кэш."""
         data = json.dumps(data)
-        await self.redis.set(key=data_id, value=data, expire=self.FILM_CACHE_EXPIRE_IN_SECONDS)
+        await self.redis.set(key=str(url), value=data, expire=self.FILM_CACHE_EXPIRE_IN_SECONDS)

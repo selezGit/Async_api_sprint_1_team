@@ -19,21 +19,22 @@ class FilmService(BaseService):
         self.elastic = elastic
 
     async def get_by_id(self,
+                        url: str,
                         film_id: str
                         ) -> Optional[Dict]:
         """Функция получения фильма по id"""
-        key = f'film:{film_id}'
-        film = await self._check_cache(key)
+        film = await self._check_cache(url)
         if not film:
             film = await self._get_data_from_elastic(data_id=film_id)
             if not film:
                 return None
 
-            await self._load_cache(key, film)
+            await self._load_cache(url, film)
 
         return film
 
     async def get_by_list_id(self,
+                             url: str,
                              person_id: str,
                              film_ids: List[str],
                              page: int,
@@ -43,14 +44,13 @@ class FilmService(BaseService):
                              ) -> Optional[List[Dict]]:
         """Функция получения фильмов по id"""
 
-        key = f'films:{person_id}:{page}:{size}:list_ids'
-        data = await self._check_cache(key)
+        data = await self._check_cache(url)
         if not data:
             data = await self._get_data_with_list_film(film_ids=film_ids, page=page, size=size)
             if not data:
                 return None
 
-            await self._load_cache(key, data)
+            await self._load_cache(url, data)
 
         return data
 
@@ -177,6 +177,7 @@ class FilmService(BaseService):
                 return None
 
     async def get_by_param(self,
+                           url: str,
                            order: str,
                            page: int,
                            size: int,
@@ -184,8 +185,7 @@ class FilmService(BaseService):
                            query: str = None
                            ) -> Optional[List[Film]]:
         """Функция получения всех фильмов с параметрами сортфировки и фильтрации"""
-        key = f'{order}:{genre}:{query}:{page}:{size}:key'
-        films = False
+        films = await self._check_cache(url)
         if not films:
 
             films = await self._get_data_from_elastic(
@@ -193,7 +193,7 @@ class FilmService(BaseService):
             if not films:
                 return None
 
-            await self._load_cache(key, films)
+            await self._load_cache(url, films)
 
         return films
 
