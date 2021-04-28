@@ -57,7 +57,7 @@ async def films_with_person(person_id: str,
 
 @router.get('/', response_model=List[Person],
             summary='Список персон')
-async def person_search(query: str,
+async def person_search(query: Optional[str] = None,
                         size: Optional[int] = 50,
                         page: Optional[int] = 1,
                         request: Request = None,
@@ -67,7 +67,7 @@ async def person_search(query: str,
     """Возвращает информацию
     по одному или нескольким персонам"""
 
-    persons = await person_service.get_by_search(url=request.url, q=query, page=page, size=size)
+    persons = await person_service.get_by_param(url=request.url, q=query, page=page, size=size)
 
     if not persons:
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND,

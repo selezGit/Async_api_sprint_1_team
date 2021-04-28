@@ -37,13 +37,13 @@ class PersonService(BaseService):
 
         return data
 
-    async def get_by_search(self,
-                            url: str,
-                            page: int,
-                            size: int,
-                            *args,
-                            **kwargs
-                            ) -> Optional[List[Person]]:
+    async def get_by_param(self,
+                           url: str,
+                           page: int,
+                           size: int,
+                           *args,
+                           **kwargs
+                           ) -> Optional[List[Person]]:
         """Найти объект(ы) по ключевому слову"""
 
         q = kwargs.get('q')
@@ -68,26 +68,27 @@ class PersonService(BaseService):
         page = kwargs.get('page')
         q = kwargs.get('q')
 
-        if bool(bool(size) + bool(page)):
+        if any([size, page, q]):
             # если что то из этого есть,
             # значит запрос был сделан с параметрами
-            try:
-                if page:
-                    query = {
-                        'size': size,
-                        'from': (page - 1) * size,
-                        "query": {
-                            "bool": {
-                                "must": [
-                                    {
-                                        "match": {
-                                            "full_name": q
-                                        }
-                                    }
-                                ]
+            query = {'size': size, 'from': (page - 1) * size}
+
+            if q:
+                query['query'] = {
+                    "bool": {
+                        "must": [
+                            {
+                                "match": {
+                                    "full_name": q
+                                }
                             }
-                        }
+                        ]
                     }
+                }
+            else:
+                query['query'] = {"match_all": {}}
+                
+            try:
                 doc = await self.elastic.search(index='persons', body=query)
 
             except exceptions.NotFoundError:
